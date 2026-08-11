@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SampleTwitter.API.UnitTests/SampleTwitter.API.UnitTests.csproj" />
+  <Project Path="SampleTwitter.API/SampleTwitter.API.csproj" />
+</Solution>
