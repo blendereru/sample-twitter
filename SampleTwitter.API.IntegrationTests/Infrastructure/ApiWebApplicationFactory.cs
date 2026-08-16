@@ -25,6 +25,10 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
+        
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        await dbContext.Database.MigrateAsync();
     }
 
     public new async Task DisposeAsync()
@@ -62,8 +66,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
     {
         using var scope = Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        await dbContext.Database.MigrateAsync();
-
+        
         await using var connection = dbContext.Database.GetDbConnection();
         await connection.OpenAsync();
 

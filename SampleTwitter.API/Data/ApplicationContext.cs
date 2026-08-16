@@ -12,6 +12,20 @@ public class ApplicationContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        
+        modelBuilder.Entity<User>(builder =>
+        {
+            builder.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<EmailConfirmationToken>(builder =>
+        {
+            builder.HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(t => t.TokenHash).IsUnique();
+            builder.HasIndex(t => new { t.UserId, t.UsedAt });
+        });
     }
 }
