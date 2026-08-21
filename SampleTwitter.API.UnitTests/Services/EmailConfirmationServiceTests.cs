@@ -4,6 +4,7 @@ using Moq;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.Exceptions;
+using SampleTwitter.API.Models;
 using SampleTwitter.API.Services;
 using SampleTwitter.API.UnitTests.Helpers;
 
@@ -34,7 +35,7 @@ public class EmailConfirmationServiceTests : IDisposable
     }
     
     [Fact]
-    public async Task SendConfirmationEmail_SendsEmailToTheUsersAddress()
+    public async Task SendConfirmationEmail_DelegatesEmailDeliveryToTheUsersAddress()
     {
         // Arrange
         var user = UserCreationHelpers.CreateUser(email: "recipient@example.com");
@@ -51,7 +52,7 @@ public class EmailConfirmationServiceTests : IDisposable
     }
     
     [Fact]
-    public async Task SendConfirmationEmail_EmailBodyContainsTheRawTokenNotTheHash()
+    public async Task SendConfirmationEmail_EmailBodyContainsRawTokenNotHash()
     {
         // Arrange
         var user = UserCreationHelpers.CreateUser();
@@ -73,7 +74,7 @@ public class EmailConfirmationServiceTests : IDisposable
     }
     
     [Fact]
-    public async Task SendConfirmationEmail_EmailBodyContainsTheUsersId()
+    public async Task SendConfirmationEmail_EmailBodyContainsUserId()
     {
         // Arrange
         var user = UserCreationHelpers.CreateUser(id: 42);
@@ -94,6 +95,21 @@ public class EmailConfirmationServiceTests : IDisposable
     }
     
     [Fact]
+    public async Task SendConfirmationEmail_DelegatesTokenHashingWithTheGeneratedRawToken()
+    {
+        // Arrange
+        var user = UserCreationHelpers.CreateUser();
+        _tokenGeneratorMock.Setup(g => g.Generate()).Returns("raw-token-abc");
+        _tokenGeneratorMock.Setup(g => g.Hash(It.IsAny<string>())).Returns("any-hash");
+
+        // Act
+        await _sut.SendConfirmationEmail(user);
+
+        // Assert
+        _tokenGeneratorMock.Verify(g => g.Hash("raw-token-abc"), Times.Once);
+    }
+    
+    [Fact]
     public async Task SendConfirmationEmail_WhenEmailSenderThrows_PropagatesTheException()
     {
         // Arrange
@@ -107,6 +123,35 @@ public class EmailConfirmationServiceTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<EmailDeliveryException>(() => _sut.SendConfirmationEmail(user));
+    }
+    
+    [Fact]
+    public async Task ConfirmEmail_HashesTheIncomingTokenBeforeLookup()
+    {
+        var user = new User
+        {
+            Id = 1, Email = "user@example.com", PasswordHash = "hash",
+            EmailConfirmed = false, RegisteredAt = DateTimeOffset.UtcNow
+        };
+        _applicationContext.Users.Add(user);
+
+        _tokenGeneratorMock.Setup(g => g.Hash("incoming-raw-token")).Returns("stored-hash");
+
+        var tokenEntity = new EmailConfirmationToken
+        {
+            UserId = 1,
+            TokenHash = "stored-hash",
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(24),
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _applicationContext.EmailConfirmationTokens.Add(tokenEntity);
+        await _applicationContext.SaveChangesAsync();
+
+        // Act
+        await _sut.ConfirmEmail(1, "incoming-raw-token");
+
+        // Assert
+        _tokenGeneratorMock.Verify(g => g.Hash("incoming-raw-token"), Times.Once);
     }
 
     public void Dispose() => _applicationContext.Dispose();

@@ -74,7 +74,7 @@ public class EmailConfirmationService : IEmailConfirmationService
         }
     }
 
-    public async Task ConfirmEmail(long userId, string token, CancellationToken ct = default)
+    public async Task<User> ConfirmEmail(long userId, string token, CancellationToken ct = default)
     {
         var tokenHash = _tokenGenerator.Hash(token);
 
@@ -94,5 +94,7 @@ public class EmailConfirmationService : IEmailConfirmationService
         await _applicationContext.SaveChangesAsync(ct);
 
         _logger.LogInformation("Email confirmed for user {UserId}", userId);
+
+        return tokenEntity.User;
     }
 }

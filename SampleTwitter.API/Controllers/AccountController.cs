@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.DTOs.RequestDTOs;
@@ -9,9 +12,14 @@ namespace SampleTwitter.API.Controllers;
 public class AccountController : ControllerBase
 {
     private readonly IAccountService _accountService;
-    public AccountController(IAccountService accountService)
+    private readonly IEmailConfirmationService _emailConfirmationService;
+    private readonly ILogger<AccountController> _logger;
+    public AccountController(IAccountService accountService, IEmailConfirmationService emailConfirmationService, 
+        ILogger<AccountController> logger)
     {
         _accountService = accountService;
+        _emailConfirmationService = emailConfirmationService;
+        _logger = logger;
     }
     
     /// <summary>
@@ -42,6 +50,42 @@ public class AccountController : ControllerBase
             : Ok(payload);
     }
 
+    /// <summary>
+    /// Confirms a user's email address using the token sent via the confirmation email.
+    /// </summary>
+    /// <response code="200">The email address was confirmed successfully.</response>
+    /// <response code="400">The confirmation link is invalid, expired, or already used.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpPost("confirm-email")]
+    [ProducesResponseType(typeof(ConfirmEmailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ConfirmEmail([FromQuery] long userId, [FromQuery] string token, CancellationToken ct)
+    {
+        var user = await _emailConfirmationService.ConfirmEmail(userId, token, ct);
+        
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Email, user.Email)
+        };
+        
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            new AuthenticationProperties
+            {
+                IsPersistent = true, 
+                IssuedUtc = DateTimeOffset.UtcNow
+            });
+        
+        _logger.LogInformation("User {UserId} confirmed email and signed in", user.Id);
+        return Ok(new ConfirmEmailResponse("Your email has been confirmed. You are now signed in."));
+    }
+    
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUser(long id)
     {
