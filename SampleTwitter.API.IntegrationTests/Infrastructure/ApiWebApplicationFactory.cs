@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Respawn;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
-using SampleTwitter.API.Options;
 using Testcontainers.PostgreSql;
 
 namespace SampleTwitter.API.IntegrationTests.Infrastructure;
@@ -19,6 +18,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         .WithUsername("test")
         .WithPassword("test")
         .Build();
+    
+    private Respawner _respawner = null!;
 
     public FakeEmailSender FakeEmailSender { get; } = new();
 
@@ -29,6 +30,14 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         using var scope = Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
         await dbContext.Database.MigrateAsync();
+        
+        await using var connection = dbContext.Database.GetDbConnection();
+        await connection.OpenAsync();
+        _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
+        {
+            DbAdapter = DbAdapter.Postgres,
+            SchemasToInclude = ["public"]
+        });
     }
 
     public new async Task DisposeAsync()
@@ -48,15 +57,6 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
         builder.ConfigureServices(services =>
         {
-            services.PostConfigure<EmailOptions>(options =>
-            {
-                options.SmtpHost = "localhost";
-                options.SmtpUsername = "test";
-                options.SmtpPassword = "test";
-                options.FromAddress = "noreply@sampletwitter.com";
-                options.FromName = "Sample Twitter";
-            });
-            
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(FakeEmailSender);
         });
@@ -69,13 +69,6 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         
         await using var connection = dbContext.Database.GetDbConnection();
         await connection.OpenAsync();
-
-        var respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"]
-        });
-
-        await respawner.ResetAsync(connection);
+        await _respawner.ResetAsync(connection);
     }
 }

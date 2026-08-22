@@ -300,3 +300,299 @@ meaning a separate anti-CSRF mechanism would then become necessary.
 **CSRF safety under `Lax`:** Because cross-site non-navigational `POST`/`PUT`/`DELETE` requests
 do not carry the cookie, no separate CSRF token is required for any state-changing endpoint in
 this API, provided that no state-changing actions are accessible via `GET` requests.
+
+---
+
+## 4. `parallelizeTestCollections: false` in `xunit.runner.json`
+
+### What xUnit Parallelism Actually Means
+
+xUnit has two distinct levels of parallelism that are easy to confuse:
+
+| Level | Setting | What it controls |
+|---|---|---|
+| **Between collections** | `parallelizeTestCollections` | Whether different `[Collection("...")]` groups run concurrently |
+| **Within a collection** | `parallelizeAssembly` (not set here) | Whether tests *inside* the same collection run concurrently — **off by default** |
+
+Setting `"parallelizeTestCollections": false` disables the first level. Tests in different
+collections will not run concurrently.
+
+### Why This Matters for Integration Tests
+
+All integration test classes inherit `IntegrationTestBase`, which carries `[Collection("Integration")]`.
+This means every test in the project belongs to the exact same collection. Because tests within
+one collection are always sequential (xUnit's default), the `parallelizeTestCollections: false`
+setting has no direct effect on our tests today — they run sequentially regardless.
+
+However, it is essential as a **defensive safeguard** for two concrete reasons:
+
+**Reason 1 — All tests share one database.**
+The `ApiWebApplicationFactory` is a `ICollectionFixture<ApiWebApplicationFactory>`, meaning one
+factory instance — and therefore one Postgres container, one schema — is shared across every test.
+If a second collection were added later without `[Collection("Integration")]`, xUnit would spin
+up a second parallel runner. That runner would hit the same database without the Respawn reset
+synchronisation, causing data from one test to bleed into assertions of another:
+
+```
+[Collection A]               [Collection B — hypothetical]
+TestA1: seeds user X         TestB1: seeds user Y
+TestA1: asserts user count   TestB1: asserts email count
+           ^                            ^
+           Both query the same shared Postgres — data bleeds across
+```
+
+**Reason 2 — `FakeEmailSender` is a Singleton.**
+`FakeEmailSender` is registered as `AddSingleton` inside `ApiWebApplicationFactory.ConfigureWebHost`.
+If two collections ran concurrently and both triggered `IEmailSender.Send()`, both would write
+to the same `FakeEmailSender` instance. Even with `ConcurrentBag` making the writes safe, the
+assertion `Assert.Single(Factory.FakeEmailSender.SentEmails)` in one test could see emails
+injected by a concurrent test in the other collection, causing a false failure.
+
+### What Happens If This Setting Is Removed
+
+If `"parallelizeTestCollections": false` is deleted and a second `[Collection]` is added to
+the project later, tests become non-deterministic. Some runs pass, some fail depending on
+scheduler timing — the hardest class of test failure to diagnose.
+
+Keeping `parallelizeTestCollections: false` makes the intent explicit and prevents this footgun
+from being introduced silently.
+
+---
+
+## 5. `FakeEmailSender` — Why `ConcurrentBag` and `IReadOnlyList` at the Same Time
+
+### The Setup
+
+`FakeEmailSender` is the test double for `IEmailSender`. It is registered in the DI container
+with `AddSingleton`, which means the **same instance is shared for the entire lifetime of the
+`ApiWebApplicationFactory`** — across all tests in the suite. This has one important consequence:
+concurrent HTTP requests handled during a single test all call `Send()` on the same object.
+
+### The Write Problem: Why `ConcurrentBag<T>`
+
+`Send()` is called from inside ASP.NET Core's request pipeline. When a test fires two HTTP
+requests simultaneously (via `Task.WhenAll`), two thread-pool threads handle those requests
+concurrently and both call `Send()` at essentially the same time.
+
+`List<T>` is **not thread-safe for concurrent writes**. Under the hood, `List<T>.Add()` can:
+1. Read the current length
+2. Resize the internal array if needed
+3. Write the new element at `index = length`
+
+If two threads both reach step 1 before either completes step 3, one thread overwrites the
+other's element. The list silently loses an item — or throws an `IndexOutOfRangeException` — with
+no indication that anything went wrong. This is a data race.
+
+`ConcurrentBag<T>` is part of `System.Collections.Concurrent` and is designed precisely for this
+pattern: multiple threads adding items concurrently, with no external locking required. Each
+`Add()` is an atomic operation.
+
+### The Read Problem: Why `IReadOnlyList<T>`
+
+`ConcurrentBag<T>` does not implement `IReadOnlyList<T>`. It implements `IEnumerable<T>` and
+`IProducerConsumerCollection<T>`. This creates a problem for assertions:
+
+```csharp
+// Without the snapshot:
+var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
+// Assert.Single receives an IEnumerable backed by the live ConcurrentBag.
+// If Send() is called on another thread while Assert.Single iterates,
+// the enumeration can see a different count than was present when iteration started.
+```
+
+The fix is to expose a **snapshot** — a new, stable `List<T>` copied from the bag at the moment
+of access:
+
+```csharp
+public IReadOnlyList<SentEmail> SentEmails => _sentEmails.ToList();
+```
+
+Every time the property is read, `ToList()` enumerates the bag and returns a frozen copy. The
+assertion then operates on that frozen list, which cannot change underneath it mid-assertion.
+`IReadOnlyList<T>` is the return type because:
+- It communicates intent: callers should not modify this collection.
+- It provides indexed access (`[0]`, `.Count`) which `IEnumerable<T>` alone does not guarantee.
+
+### Why Not `ConcurrentBag<T>` Directly?
+
+Returning `ConcurrentBag<T>` directly from `SentEmails` would expose the mutable internal state
+to test code. Nothing would prevent a test from accidentally calling `.Add()` on it. Returning
+`IReadOnlyList<T>` via `.ToList()` gives a snapshot that is both stable and write-protected.
+
+### The `Clear()` Method: Why Replace the Bag
+
+`ConcurrentBag<T>` has no `Clear()` method. The options are:
+1. Drain the bag by looping `TryTake()` until empty.
+2. Replace the field with a new empty bag.
+
+Option 2 is cleaner and is safe here because `Clear()` is **only ever called from
+`IntegrationTestBase.InitializeAsync()`**, which runs in the single-threaded test setup phase
+— never concurrently with `Send()`. Replacing the reference is a single atomic pointer
+assignment in .NET.
+
+---
+
+## 6. xUnit Lifetime Model — When `InitializeAsync` and `DisposeAsync` Fire
+
+This was the source of the original `Respawner` misconfiguration. Understanding the lifetime
+model precisely is essential.
+
+### The Three Layers
+
+There are three distinct layers of xUnit lifetime, each with a different scope:
+
+```
+Layer 1: ICollectionFixture<T>    — one instance for the entire test run
+Layer 2: IAsyncLifetime on class  — one instance per test class
+Layer 3: Constructor/Dispose      — one instance per individual test
+```
+
+In this project:
+
+| Layer | Class | Scope |
+|---|---|---|
+| `ICollectionFixture<ApiWebApplicationFactory>` | `ApiWebApplicationFactory` | Entire test run (all tests in the "Integration" collection) |
+| `IAsyncLifetime` on `IntegrationTestBase` | `IntegrationTestBase` | Per individual test |
+| `IAsyncLifetime` on `ApiWebApplicationFactory` | `ApiWebApplicationFactory` | Entire test run (same as above — it is itself the fixture) |
+
+### Layer 1 — `ICollectionFixture<ApiWebApplicationFactory>`
+
+`IntegrationTestCollection` declares:
+
+```csharp
+[CollectionDefinition("Integration")]
+public class IntegrationTestCollection : ICollectionFixture<ApiWebApplicationFactory> { }
+```
+
+This tells xUnit: **create exactly one `ApiWebApplicationFactory` and share it across every class
+that carries `[Collection("Integration")]`**.
+
+Because `ApiWebApplicationFactory` implements `IAsyncLifetime`, xUnit calls:
+- `InitializeAsync()` **once**, before the first test in the collection runs.
+- `DisposeAsync()` **once**, after the last test in the collection finishes.
+
+`ApiWebApplicationFactory.InitializeAsync()` does the expensive work:
+1. Starts the Postgres Docker container.
+2. Runs EF Core migrations.
+3. Creates the `Respawner` by inspecting the schema (the slow part).
+
+This runs **exactly once** for the entire test suite. If it ran before every test class, each run
+would start a new Docker container and run migrations — unacceptably slow.
+
+### Layer 2 — `IAsyncLifetime` on `IntegrationTestBase`
+
+```csharp
+public abstract class IntegrationTestBase : IAsyncLifetime
+{
+    public async Task InitializeAsync()
+    {
+        await Factory.ResetDatabaseAsync();  // calls _respawner.ResetAsync()
+        Factory.FakeEmailSender.Clear();
+    }
+
+    public Task DisposeAsync()
+    {
+        Client.Dispose();
+        return Task.CompletedTask;
+    }
+}
+```
+
+`IntegrationTestBase` is the **base class for every test class** (e.g., `SignUpTests`). xUnit
+creates a new instance of each test class for every individual `[Fact]` or `[Theory]` case.
+`IAsyncLifetime` on the test class means:
+- `InitializeAsync()` is called **after** the constructor but **before** the test method body.
+- `DisposeAsync()` is called **after** the test method body but **before** the instance is discarded.
+
+The complete sequence for a single `[Fact]`:
+
+```
+1.  new SignUpTests(factory)       ← constructor — DI injects the shared factory
+2.  InitializeAsync()              ← ResetDatabaseAsync() + Clear() emails
+3.  [Test method body runs]
+4.  DisposeAsync()                 ← Client.Dispose()
+5.  GC collects the SignUpTests instance
+```
+
+This means `ResetDatabaseAsync()` and `FakeEmailSender.Clear()` run **before every single test**,
+giving each test a clean slate.
+
+### The Original Misconfiguration — Why It Was Wrong
+
+The original `ResetDatabaseAsync()` called `Respawner.CreateAsync()` every time:
+
+```csharp
+// WRONG — original code
+public async Task ResetDatabaseAsync()
+{
+    using var scope = Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+
+    await using var connection = dbContext.Database.GetDbConnection();
+    await connection.OpenAsync();
+
+    // This was called before EVERY test:
+    var respawner = await Respawner.CreateAsync(connection, new RespawnerOptions { ... });
+    await respawner.ResetAsync(connection);
+}
+```
+
+`Respawner.CreateAsync()` queries `information_schema` to build a dependency-ordered list of
+every table in the schema. This schema introspection is the expensive part — it is designed to be
+called **once** and the resulting `Respawner` instance reused for all subsequent resets.
+
+By calling `CreateAsync()` before every test, the schema was re-introspected for every single
+`[Fact]`. With 16 tests, this was 16 schema introspections instead of 1. The fix was to create
+the `Respawner` during `ApiWebApplicationFactory.InitializeAsync()` (Layer 1 — once) and store
+it as a field, then only call `_respawner.ResetAsync()` in `ResetDatabaseAsync()` (Layer 2 —
+once per test).
+
+```csharp
+// CORRECT — current code
+// In ApiWebApplicationFactory.InitializeAsync() — runs ONCE:
+_respawner = await Respawner.CreateAsync(connection, new RespawnerOptions { ... });
+
+// In ResetDatabaseAsync() — runs before EVERY test, but cheaply:
+await _respawner.ResetAsync(connection);
+```
+
+### Full Timeline for the Entire Test Run
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║  ApiWebApplicationFactory.InitializeAsync()   [runs ONCE]       ║
+║  - Postgres container started                                    ║
+║  - EF Core migrations applied                                    ║
+║  - Respawner created (schema introspected)                       ║
+╠══════════════════════════════════════════════════════════════════╣
+║  For each [Fact] / [Theory case]:                                ║
+║  ┌─────────────────────────────────────────────────────────────┐ ║
+║  │  new SignUpTests(factory)   [constructor]                   │ ║
+║  │  IntegrationTestBase.InitializeAsync()                      │ ║
+║  │    - _respawner.ResetAsync()   ← wipes all rows             │ ║
+║  │    - FakeEmailSender.Clear()   ← empties sent emails        │ ║
+║  │  [Test method body]                                         │ ║
+║  │  IntegrationTestBase.DisposeAsync()                         │ ║
+║  │    - Client.Dispose()                                       │ ║
+║  └─────────────────────────────────────────────────────────────┘ ║
+║  (repeated for every test in sequence)                           ║
+╠══════════════════════════════════════════════════════════════════╣
+║  ApiWebApplicationFactory.DisposeAsync()      [runs ONCE]       ║
+║  - Postgres container stopped and removed                        ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+### Key Rules to Remember
+
+1. `ICollectionFixture<T>` lifetime = **the entire test run**. Use it for anything expensive to
+   create: Docker containers, database migrations, `Respawner` creation.
+
+2. `IAsyncLifetime` on a test class = **per individual test**. Use it for cleanup that must
+   happen before every test: resetting state, clearing fakes.
+
+3. The constructor of a test class also runs **per individual test**. Use it only for
+   dependency injection — never for async work (constructors cannot be `async`).
+
+4. The shared fixture is injected through the constructor parameter. It is the same object
+   instance for every test in the collection. Any mutable state on it (like `FakeEmailSender`)
+   must either be reset per-test (via `InitializeAsync`) or be thread-safe.
