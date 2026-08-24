@@ -153,6 +153,37 @@ public class EmailConfirmationServiceTests : IDisposable
         // Assert
         _tokenGeneratorMock.Verify(g => g.Hash("incoming-raw-token"), Times.Once);
     }
+    
+    [Fact]
+    public async Task ConfirmEmail_WhenSuccessful_ReturnsUserWithEmailConfirmedTrue()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = 1, Email = "user@example.com", PasswordHash = "hash",
+            EmailConfirmed = false, RegisteredAt = DateTimeOffset.UtcNow
+        };
+        _applicationContext.Users.Add(user);
+
+        _tokenGeneratorMock.Setup(g => g.Hash("raw-token")).Returns("hashed-token");
+
+        _applicationContext.EmailConfirmationTokens.Add(new EmailConfirmationToken
+        {
+            UserId = 1,
+            TokenHash = "hashed-token",
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(24),
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+
+        // Act
+        var returnedUser = await _sut.ConfirmEmail(1, "raw-token");
+
+        // Assert
+        Assert.True(returnedUser.EmailConfirmed);
+        Assert.Equal(1, returnedUser.Id);
+        Assert.Equal("user@example.com", returnedUser.Email);
+    }
 
     public void Dispose() => _applicationContext.Dispose();
 }
