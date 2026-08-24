@@ -43,9 +43,6 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 4. Restore
-      #
-      # Done once here. All subsequent steps use --no-restore so they don't
-      # repeat the network round-trips.
       # -----------------------------------------------------------------------
       - name: Restore
         run: dotnet restore sample-twitter.slnx
@@ -53,21 +50,21 @@ jobs:
       # -----------------------------------------------------------------------
       # 5. Build
       #
-      # Compiles every project in the solution. --no-restore reuses what step
-      # 4 already fetched. -warnaserror is intentionally NOT set here because
-      # the codebase has pre-existing nullable warnings on User.cs (CS8618) and
-      # a package vulnerability warning (NU1903) that are tracked separately.
-      # Add -warnaserror once those are resolved.
+      # -warnaserror is intentionally NOT set: the codebase has pre-existing
+      # CS8618 (nullable) and NU1903 (package vulnerability) warnings that are
+      # tracked separately. Add -warnaserror once those are resolved.
       # -----------------------------------------------------------------------
       - name: Build
         run: dotnet build sample-twitter.slnx --no-restore --configuration Release
 
       # -----------------------------------------------------------------------
-      # 6. Unit Tests
+      # 6. Unit Tests + coverage collection
       #
-      # Run first -- they are fast (milliseconds, no Docker required) and give
-      # immediate feedback if a collaborator wiring contract breaks.
-      # --no-build reuses the Release build from step 5.
+      # --collect:"XPlat Code Coverage" activates coverlet.collector, which
+      # instruments the SampleTwitter.API assembly at runtime and writes a
+      # coverage.cobertura.xml file into a GUID-named subdirectory under
+      # ./coverage. The GUID directory means this step and step 7 (integration
+      # tests) can both write to ./coverage without overwriting each other.
       # -----------------------------------------------------------------------
       - name: Unit Tests
         run: >
@@ -75,20 +72,14 @@ jobs:
           --no-build
           --configuration Release
           --logger "console;verbosity=normal"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
 
       # -----------------------------------------------------------------------
-      # 7. Integration Tests
+      # 7. Integration Tests + coverage collection
       #
-      # Run only after unit tests pass. These spin up a real Postgres container
-      # via Testcontainers. The ubuntu-latest runner has Docker pre-installed,
-      # so no extra service container setup is needed -- Testcontainers manages
-      # the container lifecycle entirely on its own.
-      #
-      # TESTCONTAINERS_RYUK_DISABLED=true: Ryuk is a Testcontainers reaper
-      # process that cleans up orphaned containers. On GitHub Actions, the
-      # socket path and permissions can cause Ryuk to fail to connect. Since
-      # the runner itself is ephemeral (destroyed after the job), Ryuk is
-      # unnecessary -- containers are cleaned up when the VM is torn down.
+      # Same --collect flag. coverlet merges with the existing data at report
+      # generation time (not here) -- both XML files are independent snapshots.
       # -----------------------------------------------------------------------
       - name: Integration Tests
         env:
@@ -98,3 +89,72 @@ jobs:
           --no-build
           --configuration Release
           --logger "console;verbosity=normal"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      # -----------------------------------------------------------------------
+      # 8. Install ReportGenerator
+      #
+      # ReportGenerator is installed as a global .NET tool on the runner.
+      # It reads the two coverage.cobertura.xml files produced above, merges
+      # them into a single combined picture, and generates two output formats:
+      #   - Html        : full interactive report, uploaded as a job artifact
+      #   - MarkdownSummaryGithub : one-page summary written to the job summary
+      #
+      # Why a global tool install and not a PackageReference?
+      # ReportGenerator is a dev-time report renderer, not a library — it has
+      # no API our code calls. Installing it as a tool on the CI runner keeps
+      # it out of every developer's project dependencies.
+      # -----------------------------------------------------------------------
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      # -----------------------------------------------------------------------
+      # 9. Generate coverage report
+      #
+      # -reports     : glob picking up both XML files (one per test project,
+      #                each in its own GUID subdirectory under ./coverage).
+      # -targetdir   : output folder for the rendered report.
+      # -reporttypes : Html for the artifact + MarkdownSummaryGithub for the
+      #                job summary panel.
+      # -assemblyfilters : +SampleTwitter.API includes only application code.
+      #                    Without this, the report would include coverage of
+      #                    the test projects themselves (which would always be
+      #                    100% -- every test method is "covered" by running).
+      # -classfilters: Excludes EF Core migration classes. They contain only
+      #                auto-generated Up()/Down() scaffolding -- measuring their
+      #                coverage would inflate the denominator with lines we
+      #                never intend to test directly.
+      # -----------------------------------------------------------------------
+      - name: Generate coverage report
+        run: >
+          reportgenerator
+          -reports:"./coverage/**/coverage.cobertura.xml"
+          -targetdir:"./coverage-report"
+          -reporttypes:"Html;MarkdownSummaryGithub"
+          -assemblyfilters:"+SampleTwitter.API"
+          -classfilters:"-*.Migrations.*"
+
+      # -----------------------------------------------------------------------
+      # 10. Write summary to the GitHub job summary panel
+      #
+      # MarkdownSummaryGithub produces a file called SummaryGithub.md.
+      # Appending it to $GITHUB_STEP_SUMMARY makes it appear directly on the
+      # Actions run page -- no need to download an artifact to see the numbers.
+      # -----------------------------------------------------------------------
+      - name: Write coverage summary to job summary
+        run: cat ./coverage-report/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      # -----------------------------------------------------------------------
+      # 11. Upload full HTML report as a job artifact
+      #
+      # The Markdown summary shows overall line/branch/method percentages.
+      # The HTML artifact shows per-file, per-class, per-line detail --
+      # which specific lines are uncovered. Retained for 30 days by default.
+      # -----------------------------------------------------------------------
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage-report
+          retention-days: 30
