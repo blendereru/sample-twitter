@@ -1,0 +1,100 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (.NET 10)
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Setup .NET 10
+      # -----------------------------------------------------------------------
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # -----------------------------------------------------------------------
+      # 3. Cache NuGet packages
+      #
+      # Keyed on the solution file so the cache is invalidated whenever any
+      # project reference or package version changes. Without this, every run
+      # downloads all packages from nuget.org (~20-30s).
+      # -----------------------------------------------------------------------
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.slnx') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # -----------------------------------------------------------------------
+      # 4. Restore
+      #
+      # Done once here. All subsequent steps use --no-restore so they don't
+      # repeat the network round-trips.
+      # -----------------------------------------------------------------------
+      - name: Restore
+        run: dotnet restore sample-twitter.slnx
+
+      # -----------------------------------------------------------------------
+      # 5. Build
+      #
+      # Compiles every project in the solution. --no-restore reuses what step
+      # 4 already fetched. -warnaserror is intentionally NOT set here because
+      # the codebase has pre-existing nullable warnings on User.cs (CS8618) and
+      # a package vulnerability warning (NU1903) that are tracked separately.
+      # Add -warnaserror once those are resolved.
+      # -----------------------------------------------------------------------
+      - name: Build
+        run: dotnet build sample-twitter.slnx --no-restore --configuration Release
+
+      # -----------------------------------------------------------------------
+      # 6. Unit Tests
+      #
+      # Run first -- they are fast (milliseconds, no Docker required) and give
+      # immediate feedback if a collaborator wiring contract breaks.
+      # --no-build reuses the Release build from step 5.
+      # -----------------------------------------------------------------------
+      - name: Unit Tests
+        run: >
+          dotnet test SampleTwitter.API.UnitTests/SampleTwitter.API.UnitTests.csproj
+          --no-build
+          --configuration Release
+          --logger "console;verbosity=normal"
+
+      # -----------------------------------------------------------------------
+      # 7. Integration Tests
+      #
+      # Run only after unit tests pass. These spin up a real Postgres container
+      # via Testcontainers. The ubuntu-latest runner has Docker pre-installed,
+      # so no extra service container setup is needed -- Testcontainers manages
+      # the container lifecycle entirely on its own.
+      #
+      # TESTCONTAINERS_RYUK_DISABLED=true: Ryuk is a Testcontainers reaper
+      # process that cleans up orphaned containers. On GitHub Actions, the
+      # socket path and permissions can cause Ryuk to fail to connect. Since
+      # the runner itself is ephemeral (destroyed after the job), Ryuk is
+      # unnecessary -- containers are cleaned up when the VM is torn down.
+      # -----------------------------------------------------------------------
+      - name: Integration Tests
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+        run: >
+          dotnet test SampleTwitter.API.IntegrationTests/SampleTwitter.API.IntegrationTests.csproj
+          --no-build
+          --configuration Release
+          --logger "console;verbosity=normal"

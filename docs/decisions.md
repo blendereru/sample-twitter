@@ -1,6 +1,6 @@
 # Design Decisions
 
-This document records specific design decisions made during the development of SampleTwitter API,
+This document records specific design decisions made during the development of `SampleTwitter API`,
 along with the reasoning behind them. It also clarifies non-obvious framework concepts that are
 tightly coupled to those decisions. The intent is that a future reader — including the author —
 can open this file and immediately understand the "why" and "how" of each choice without needing
@@ -560,7 +560,7 @@ await _respawner.ResetAsync(connection);
 
 ```
 ╔══════════════════════════════════════════════════════════════════╗
-║  ApiWebApplicationFactory.InitializeAsync()   [runs ONCE]       ║
+║  ApiWebApplicationFactory.InitializeAsync()   [runs ONCE]        ║
 ║  - Postgres container started                                    ║
 ║  - EF Core migrations applied                                    ║
 ║  - Respawner created (schema introspected)                       ║
@@ -577,7 +577,7 @@ await _respawner.ResetAsync(connection);
 ║  └─────────────────────────────────────────────────────────────┘ ║
 ║  (repeated for every test in sequence)                           ║
 ╠══════════════════════════════════════════════════════════════════╣
-║  ApiWebApplicationFactory.DisposeAsync()      [runs ONCE]       ║
+║  ApiWebApplicationFactory.DisposeAsync()      [runs ONCE]        ║
 ║  - Postgres container stopped and removed                        ║
 ╚══════════════════════════════════════════════════════════════════╝
 ```
