@@ -105,3 +105,19 @@ packages/
 .idea/dictionaries
 .idea/workspace.xml
 *.dockerignore
+
+# Node & Frontend
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Environment files
+.env.local
+.env.*.local
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
