@@ -30,7 +30,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "Sup3rSecret1!");
 
         // Act
-        var response = await _rawClient.PostAsJsonAsync("/api/account/login",
+        var response = await _rawClient.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "user@example.com", Password = "Sup3rSecret1!" });
 
         // Assert — HTTP contract
@@ -60,7 +60,7 @@ public class LoginTests : IntegrationTestBase
         object requestBody, string expectedInvalidField)
     {
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/login", requestBody);
+        var response = await Client.PostAsJsonAsync("/api/account/signin", requestBody);
 
         // Assert
         await response.AssertValidationProblemDetails(expectedInvalidField);
@@ -72,7 +72,7 @@ public class LoginTests : IntegrationTestBase
         // Arrange — no users seeded
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/login",
+        var response = await Client.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "nobody@example.com", Password = "Sup3rSecret1!" });
 
         // Assert
@@ -87,7 +87,7 @@ public class LoginTests : IntegrationTestBase
         await SeedUnconfirmedUser("pending@example.com", "Sup3rSecret1!");
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/login",
+        var response = await Client.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "pending@example.com", Password = "Sup3rSecret1!" });
 
         // Assert
@@ -101,7 +101,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "CorrectPassword1!");
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/login",
+        var response = await Client.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "user@example.com", Password = "WrongPassword1!" });
 
         // Assert
@@ -116,7 +116,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "Sup3rSecret1!");
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/login",
+        var response = await Client.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "  USER@EXAMPLE.COM  ", Password = "Sup3rSecret1!" });
 
         // Assert
@@ -134,14 +134,14 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "CorrectPassword1!");
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/login",
+        var response = await Client.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "user@example.com", Password = "WrongPassword1!" });
 
         // Assert — the public detail should be the same generic message for wrong password
         // and non-existent user, preventing user enumeration
         var wrongPwDetails = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
 
-        var nonExistentResponse = await Client.PostAsJsonAsync("/api/account/login",
+        var nonExistentResponse = await Client.PostAsJsonAsync("/api/account/signin",
             new LoginRequest { Email = "noone@example.com", Password = "Whatever1!" });
         var nonExistentDetails = await nonExistentResponse.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
 
