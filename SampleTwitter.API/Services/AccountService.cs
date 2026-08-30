@@ -83,6 +83,40 @@ public class AccountService : IAccountService
         return new RegisterResult(user.Id, user.Email, IsNewRegistration: true);
     }
     
+    public async Task<LoginResult> Login(LoginRequest request, CancellationToken ct = default)
+    {
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+        using var _ = LogContext.PushProperty("Email", normalizedEmail);
+
+        _logger.LogInformation("Login attempt started");
+
+        var user = await _applicationContext.Users
+            .SingleOrDefaultAsync(u => u.Email == normalizedEmail, ct);
+
+        if (user is null)
+        {
+            _logger.LogWarning("Login failed — user not found");
+            throw new InvalidCredentialsException($"No user found with email {normalizedEmail}.");
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            _logger.LogWarning("Login failed — email not confirmed for user {UserId}", user.Id);
+            throw new EmailNotConfirmedException($"User {user.Id} has not confirmed their email.");
+        }
+
+        if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            _logger.LogWarning("Login failed — invalid password for user {UserId}", user.Id);
+            throw new InvalidCredentialsException($"Invalid password for user {user.Id}.");
+        }
+
+        _logger.LogInformation("User {UserId} authenticated successfully", user.Id);
+
+        return new LoginResult(user.Id, user.Email);
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)
     {
         return ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;

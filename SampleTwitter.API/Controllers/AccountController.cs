@@ -85,6 +85,47 @@ public class AccountController : ControllerBase
         _logger.LogInformation("User {UserId} confirmed email and signed in", user.Id);
         return Ok(new ConfirmEmailResponse("Your email has been confirmed. You are now signed in."));
     }
+    /// <summary>
+    /// Authenticates a user with email and password and issues an authentication cookie.
+    /// </summary>
+    /// <response code="200">The user was authenticated successfully.</response>
+    /// <response code="400">The request body failed validation (e.g. missing or malformed email).</response>
+    /// <response code="401">The email or password is incorrect.</response>
+    /// <response code="403">The user's email address has not been confirmed yet.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpPost("signin")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Login(LoginRequest request)
+    {
+        var result = await _accountService.Login(request);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, result.UserId.ToString()),
+            new(ClaimTypes.Email, result.Email)
+        };
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            new AuthenticationProperties
+            {
+                IsPersistent = true,
+                IssuedUtc = DateTimeOffset.UtcNow
+            });
+
+        _logger.LogInformation("User {UserId} logged in", result.UserId);
+
+        return Ok(new LoginResponse(result.UserId, result.Email, "Login successful."));
+    }
     
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUser(long id)
