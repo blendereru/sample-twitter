@@ -99,6 +99,106 @@ public class AccountServiceTests : IDisposable
         // Assert
         _passwordHasherMock.Verify(h => h.Hash("NewP@ss1!"), Times.Once);
     }
+    [Fact]
+    public async Task Login_ValidCredentials_ReturnsLoginResultWithCorrectUserIdAndEmail()
+    {
+        // Arrange
+        _applicationContext.Users.Add(new User
+        {
+            Email = "user@example.com", PasswordHash = "hashed-pw",
+            EmailConfirmed = true, RegisteredAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+        _passwordHasherMock.Setup(h => h.Verify("MyPassword1!", "hashed-pw")).Returns(true);
+
+        // Act
+        var result = await _sut.Login(new LoginRequest { Email = "user@example.com", Password = "MyPassword1!" });
+
+        // Assert
+        Assert.Equal("user@example.com", result.Email);
+        Assert.True(result.UserId > 0);
+    }
+
+    [Fact]
+    public async Task Login_EmailWithWhitespaceAndMixedCase_NormalizesBeforeLookup()
+    {
+        // Arrange
+        _applicationContext.Users.Add(new User
+        {
+            Email = "normalized@example.com", PasswordHash = "hashed-pw",
+            EmailConfirmed = true, RegisteredAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+        _passwordHasherMock.Setup(h => h.Verify(It.IsAny<string>(), "hashed-pw")).Returns(true);
+
+        // Act
+        var result = await _sut.Login(new LoginRequest { Email = "  NORMALIZED@EXAMPLE.COM  ", Password = "pass" });
+
+        // Assert
+        Assert.Equal("normalized@example.com", result.Email);
+    }
+
+    [Fact]
+    public async Task Login_ValidCredentials_DelegatesVerificationToPasswordHasher()
+    {
+        // Arrange
+        _applicationContext.Users.Add(new User
+        {
+            Email = "user@example.com", PasswordHash = "stored-hash",
+            EmailConfirmed = true, RegisteredAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+        _passwordHasherMock.Setup(h => h.Verify("MyPassword1!", "stored-hash")).Returns(true);
+
+        // Act
+        await _sut.Login(new LoginRequest { Email = "user@example.com", Password = "MyPassword1!" });
+
+        // Assert
+        _passwordHasherMock.Verify(h => h.Verify("MyPassword1!", "stored-hash"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_NonExistentUser_ThrowsInvalidCredentialsException()
+    {
+        // Arrange — no users seeded
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => _sut.Login(new LoginRequest { Email = "nobody@example.com", Password = "pass" }));
+    }
+
+    [Fact]
+    public async Task Login_UnconfirmedEmail_ThrowsEmailNotConfirmedException()
+    {
+        // Arrange
+        _applicationContext.Users.Add(new User
+        {
+            Email = "unconfirmed@example.com", PasswordHash = "hashed-pw",
+            EmailConfirmed = false, RegisteredAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<EmailNotConfirmedException>(
+            () => _sut.Login(new LoginRequest { Email = "unconfirmed@example.com", Password = "pass" }));
+    }
+
+    [Fact]
+    public async Task Login_WrongPassword_ThrowsInvalidCredentialsException()
+    {
+        // Arrange
+        _applicationContext.Users.Add(new User
+        {
+            Email = "user@example.com", PasswordHash = "correct-hash",
+            EmailConfirmed = true, RegisteredAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+        _passwordHasherMock.Setup(h => h.Verify("wrong-password", "correct-hash")).Returns(false);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => _sut.Login(new LoginRequest { Email = "user@example.com", Password = "wrong-password" }));
+    }
 
     public void Dispose() => _applicationContext.Dispose();
 }
