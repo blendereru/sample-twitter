@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.DTOs.RequestDTOs;
@@ -125,6 +126,29 @@ public class AccountController : ControllerBase
         _logger.LogInformation("User {UserId} logged in", result.UserId);
 
         return Ok(new LoginResponse(result.UserId, result.Email, "Login successful."));
+    }
+    
+    /// <summary>
+    /// Returns the profile information of the currently authenticated user.
+    /// </summary>
+    /// <response code="200">The authenticated user's profile information.</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">The authenticated user's account could not be found.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(MeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Me(CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = long.Parse(userIdClaim!);
+
+        var user = await _accountService.GetUserById(userId, ct);
+
+        return Ok(new MeResponse(user.Id, user.Email, user.RegisteredAt));
     }
     
     [HttpGet("{id}")]

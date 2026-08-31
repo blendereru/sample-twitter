@@ -117,6 +117,20 @@ public class AccountService : IAccountService
         return new LoginResult(user.Id, user.Email);
     }
 
+    public async Task<User> GetUserById(long userId, CancellationToken ct = default)
+    {
+        var user = await _applicationContext.Users
+            .SingleOrDefaultAsync(u => u.Id == userId, ct);
+
+        if (user is null)
+        {
+            _logger.LogWarning("User {UserId} not found", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        return user;
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)
     {
         return ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Home, Hash, Bell, Mail, Bookmark, User, Twitter, Feather, LogIn, UserPlus } from 'lucide-vue-next';
-import { useRoute } from 'vue-router';
+import { Home, Hash, Bell, Mail, Bookmark, User, Twitter, Feather, LogIn, UserPlus, LogOut } from 'lucide-vue-next';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 
 const navItems = [
@@ -14,6 +15,11 @@ const navItems = [
   { name: 'Bookmarks', path: '/#bookmarks', icon: Bookmark },
   { name: 'Profile', path: '/#profile', icon: User },
 ];
+
+function handleLogout() {
+  authStore.clearAuth();
+  router.push('/login');
+}
 </script>
 
 <template>
@@ -71,9 +77,9 @@ const navItems = [
       </div>
     </div>
 
-    <div v-if="authStore.isAuthenticated" class="p-2 rounded-full hover:bg-neutral-800 flex items-center justify-between transition-colors cursor-pointer">
+    <div v-if="authStore.isAuthenticated" class="p-2 rounded-full hover:bg-neutral-800/60 flex items-center justify-between transition-colors">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-sky-400">
+        <div class="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-sky-400 shrink-0">
           U
         </div>
         <div class="hidden xl:flex flex-col text-sm">
@@ -81,6 +87,14 @@ const navItems = [
           <span class="text-neutral-500 text-xs truncate max-w-[120px]">{{ authStore.currentUserEmail || 'Signed in' }}</span>
         </div>
       </div>
+      <button
+        @click="handleLogout"
+        title="Sign out"
+        class="p-2 hover:bg-red-500/10 rounded-full text-neutral-400 hover:text-red-400 transition-colors"
+      >
+        <LogOut class="w-4 h-4" />
+      </button>
     </div>
   </header>
 </template>
+

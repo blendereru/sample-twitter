@@ -1,7 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import Sidebar from '@/components/layout/Sidebar.vue';
 import RightBar from '@/components/layout/RightBar.vue';
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
+
+onMounted(() => {
+  authStore.fetchCurrentUser();
+});
 </script>
+
 
 <template>
   <div class="min-h-screen bg-black text-[#e7e9ea] flex justify-center selection:bg-sky-500 selection:text-white">

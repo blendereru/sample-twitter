@@ -12,6 +12,23 @@ export interface ConfirmEmailResponse {
   message: string;
 }
 
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  userId: number;
+  email: string;
+  message: string;
+}
+
+export interface MeResponse {
+  id: number;
+  email: string;
+  registeredAt: string;
+}
+
 export interface ProblemDetails {
   type?: string;
   title?: string;

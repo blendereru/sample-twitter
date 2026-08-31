@@ -200,5 +200,33 @@ public class AccountServiceTests : IDisposable
             () => _sut.Login(new LoginRequest { Email = "user@example.com", Password = "wrong-password" }));
     }
 
+    [Fact]
+    public async Task GetUserById_ExistingUser_ReturnsUserWithCorrectFields()
+    {
+        // Arrange
+        _applicationContext.Users.Add(new User
+        {
+            Email = "user@example.com", PasswordHash = "hash",
+            EmailConfirmed = true, RegisteredAt = DateTimeOffset.UtcNow
+        });
+        await _applicationContext.SaveChangesAsync();
+        var seededUser = _applicationContext.Users.Single();
+
+        // Act
+        var result = await _sut.GetUserById(seededUser.Id);
+
+        // Assert
+        Assert.Equal(seededUser.Id, result.Id);
+        Assert.Equal("user@example.com", result.Email);
+    }
+
+    [Fact]
+    public async Task GetUserById_NonExistentId_ThrowsUserNotFoundException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<UserNotFoundException>(
+            () => _sut.GetUserById(999));
+    }
+
     public void Dispose() => _applicationContext.Dispose();
 }

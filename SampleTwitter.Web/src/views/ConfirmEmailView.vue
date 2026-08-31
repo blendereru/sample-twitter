@@ -37,7 +37,7 @@ onMounted(async () => {
     const res = await confirmEmail(userId, token);
     success.value = true;
     successMessage.value = res.message || 'Your email has been confirmed. You are now signed in.';
-    authStore.setAuthenticated(userId);
+    await authStore.fetchCurrentUser();
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     errorMessage.value = parsed.detail || parsed.message || 'This confirmation link is invalid or has expired.';
