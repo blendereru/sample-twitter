@@ -112,7 +112,16 @@ dist/
 dist-ssr/
 .vite/
 
-# Environment files
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Test and Coverage results
+coverage/
+test-results/
+playwright-report/
+
+# Environment and local overrides
+*.local
 .env.local
 .env.*.local
 

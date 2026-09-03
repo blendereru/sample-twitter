@@ -29,6 +29,17 @@ export interface MeResponse {
   registeredAt: string;
 }
 
+export interface CreatePostRequest {
+  text?: string;
+  imageUrl?: string;
+  replyId?: number;
+}
+
+export interface CreatePostResponse {
+  postId: number;
+  message: string;
+}
+
 export interface ProblemDetails {
   type?: string;
   title?: string;

@@ -8,6 +8,7 @@ const props = defineProps<{
   avatar: string;
   content: string;
   timestamp: string;
+  imageUrl?: string;
   likes?: number;
   retweets?: number;
   replies?: number;
@@ -34,7 +35,12 @@ function toggleLike() {
         <span class="text-neutral-500 hover:underline">{{ timestamp }}</span>
       </div>
 
-      <p class="text-sm leading-relaxed text-neutral-200 whitespace-pre-line">{{ content }}</p>
+      <p v-if="content" class="text-sm leading-relaxed text-neutral-200 whitespace-pre-line">{{ content }}</p>
+
+      <div v-if="imageUrl" class="mt-2 rounded-2xl overflow-hidden border border-neutral-800 max-h-96">
+        <img :src="imageUrl" alt="Attachment" class="w-full h-full object-cover" />
+      </div>
+
 
       <div class="flex items-center justify-between text-neutral-500 text-xs mt-2 max-w-md">
         <button class="flex items-center gap-1.5 hover:text-sky-400 group transition-colors">

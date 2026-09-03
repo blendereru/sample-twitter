@@ -44,8 +44,6 @@ public class PostController : ControllerBase
 
         var post = await _postService.Create(request, userId, ct);
 
-        _logger.LogInformation("User {UserId} created post {PostId}", userId, post.Id);
-
         var response = new CreatePostResponse(post.Id, "Post created successfully.");
 
         return CreatedAtAction(nameof(GetById), new { id = post.Id }, response);

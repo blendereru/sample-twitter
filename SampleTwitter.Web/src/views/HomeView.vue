@@ -7,7 +7,20 @@ import { useAuthStore } from '@/stores/auth';
 const authStore = useAuthStore();
 const activeTab = ref<'forYou' | 'following'>('forYou');
 
-const tweets = ref([
+interface TweetItem {
+  id: number;
+  author: string;
+  handle: string;
+  avatar: string;
+  content: string;
+  timestamp: string;
+  imageUrl?: string;
+  likes: number;
+  retweets: number;
+  replies: number;
+}
+
+const tweets = ref<TweetItem[]>([
   {
     id: 1,
     author: 'ASP.NET Core',
@@ -32,13 +45,14 @@ const tweets = ref([
   }
 ]);
 
-function handleNewTweet(content: string) {
+function handleNewTweet(post: { id: number; text?: string; imageUrl?: string }) {
   tweets.value.unshift({
-    id: Date.now(),
+    id: post.id,
     author: `User #${authStore.currentUserId || 'Me'}`,
     handle: authStore.currentUserEmail || '@me',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80',
-    content,
+    content: post.text || '',
+    imageUrl: post.imageUrl,
     timestamp: 'Just now',
     likes: 0,
     retweets: 0,
@@ -85,6 +99,7 @@ function handleNewTweet(content: string) {
         :handle="tweet.handle"
         :avatar="tweet.avatar"
         :content="tweet.content"
+        :image-url="tweet.imageUrl"
         :timestamp="tweet.timestamp"
         :likes="tweet.likes"
         :retweets="tweet.retweets"
@@ -93,3 +108,4 @@ function handleNewTweet(content: string) {
     </div>
   </main>
 </template>
+
