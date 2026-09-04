@@ -1,4 +1,6 @@
 ## SampleTwitter
+[![CI](https://github.com/blendereru/sample-twitter/actions/workflows/ci.yml/badge.svg)](https://github.com/blendereru/sample-twitter/actions/workflows/ci.yml)
+
 A sample twitter app(pure CRUD), intended to be a practice project. Backend written in c#/.net core using simple
 `MVC` pattern with `EF Core` as `ORM`, and client-side scripts written fully in Vue.js/typescript. 
 Not caring about front-end part, 100% `slopping`. 
