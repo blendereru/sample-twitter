@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="SampleTwitter.API.IntegrationTests/SampleTwitter.API.IntegrationTests.csproj" />
   <Project Path="SampleTwitter.API.UnitTests/SampleTwitter.API.UnitTests.csproj" />
+  <Project Path="SampleTwitter.API.ArchitectureTests/SampleTwitter.API.ArchitectureTests.csproj" />
   <Project Path="SampleTwitter.API/SampleTwitter.API.csproj" />
 </Solution>
