@@ -68,7 +68,6 @@ dotnet_style_namespace_match_folder = true:suggestion
 #### Csharp Coding Conventions ####
 
 # var preferences — use var when the type is apparent
-csharp_style_var_for_built_in_types = false:suggestion
 csharp_style_var_when_type_is_apparent = true:suggestion
 csharp_style_var_elsewhere = true:suggestion
 
@@ -103,8 +102,10 @@ csharp_using_directive_placement = outside_namespace:suggestion
 # Namespace preferences — file-scoped as used throughout the project
 csharp_style_namespace_declarations = file_scoped:warning
 
-# Prefer primary constructors (C# 12+)
-csharp_style_prefer_primary_constructors = false:suggestion
+# Don't prefer primary constructors (C# 12+)
+csharp_style_prefer_primary_constructors = false:none
+dotnet_diagnostic.IDE0290.severity = none
+resharper_convert_to_primary_constructor_highlighting = none
 
 # Misc preferences
 csharp_style_prefer_local_over_anonymous_function = true:suggestion
