@@ -52,4 +52,37 @@ public class PostService : IPostService
 
         return post;
     }
+
+    public async Task<Post> Edit(long postId, EditPostRequest request, long userId, CancellationToken ct = default)
+    {
+        var post = await _applicationContext.Posts
+            .SingleOrDefaultAsync(p => p.Id == postId, ct);
+
+        if (post is null)
+        {
+            _logger.LogWarning("Edit failed — post {PostId} not found", postId);
+            throw new PostNotFoundException($"Post with id {postId} was not found.");
+        }
+
+        if (post.UserId != userId)
+        {
+            _logger.LogWarning("Edit forbidden — user {UserId} does not own post {PostId}", userId, postId);
+            throw new ForbiddenException($"User {userId} attempted to edit post {postId} owned by user {post.UserId}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
+        {
+            throw new EmptyPostException("User attempted to edit a post to have no text and no image.");
+        }
+
+        post.Text = request.Text?.Trim();
+        post.ImageUrl = request.ImageUrl;
+        post.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _applicationContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Post {PostId} edited by user {UserId}", post.Id, userId);
+
+        return post;
+    }
 }
