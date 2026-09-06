@@ -76,14 +76,14 @@ public class MeTests : IntegrationTestBase
         // Arrange
         await Client.PostAsJsonAsync("/api/account/signup",
             new SignUpRequest { Email = "confirm-me@example.com", Password = "Sup3rSecret1!" });
-        
+
         var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
         var confirmUrl = ExtractConfirmationUrl(sentEmail.HtmlBody);
 
         // Act
         var confirmResponse = await Client.PostAsync(confirmUrl, content: null);
         Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
-        
+
         var meResponse = await Client.GetAsync("/api/account/me");
 
         // Assert
