@@ -41,8 +41,26 @@ public class MeTests : IntegrationTestBase
     [Fact]
     public async Task Unauthenticated_Returns401()
     {
+        // Arrange - no authentication cookie provided
+
         // Act
         var response = await Client.GetAsync("/api/account/me");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvalidCookie_Returns401()
+    {
+        // Arrange
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/account/me")
+        {
+            Headers = { { "Cookie", "SampleTwitter.Auth=invalid_or_tampered_cookie_payload" } }
+        };
+
+        // Act
+        var response = await Client.SendAsync(request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -111,6 +129,53 @@ public class MeTests : IntegrationTestBase
         // Assert
         Assert.DoesNotContain("passwordHash", rawJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("password", rawJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Authenticated_WithMultipleUsersInDatabase_ReturnsCurrentAuthenticatedUser()
+    {
+        // Arrange
+        await SeedConfirmedUser("alice@example.com", "Sup3rSecret1!");
+        await SeedConfirmedUser("bob@example.com", "Sup3rSecret1!");
+
+        await Client.PostAsJsonAsync("/api/account/signin",
+            new LoginRequest { Email = "bob@example.com", Password = "Sup3rSecret1!" });
+
+        // Act
+        var response = await Client.GetAsync("/api/account/me");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<MeResponse>();
+        Assert.NotNull(body);
+        Assert.Equal("bob@example.com", body.Email);
+    }
+
+    [Fact]
+    public async Task Authenticated_UserDeletedFromDatabase_Returns404WithProblemDetails()
+    {
+        // Arrange
+        var password = "Sup3rSecret1!";
+        var email = "deleted-user@example.com";
+        await SeedConfirmedUser(email, password);
+
+        await Client.PostAsJsonAsync("/api/account/signin",
+            new LoginRequest { Email = email, Password = password });
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+            var user = db.Users.Single(u => u.Email == email);
+            db.Users.Remove(user);
+            await db.SaveChangesAsync();
+        }
+
+        // Act
+        var response = await Client.GetAsync("/api/account/me");
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.NotFound);
     }
 
     private async Task SeedConfirmedUser(string email, string password)

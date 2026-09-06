@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SampleTwitter.API.Data;
+using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.IntegrationTests.Infrastructure;
 using SampleTwitter.API.Models;
@@ -136,10 +137,145 @@ public class ConfirmEmailTests : IntegrationTestBase
         // Assert — second call is rejected because UsedAt is now set
         await secondResponse.AssertProblemDetails(HttpStatusCode.BadRequest);
     }
-    
-    private async Task<(long UserId, string RawToken)> SeedUserWithValidToken(string email)
+
+    [Fact]
+    public async Task CrossUser_TokenBelongsToDifferentUser_Returns400WithProblemDetails()
     {
-        const string rawToken = "integration-test-raw-token";
+        // Arrange
+        var (userAId, _) = await SeedUserWithValidToken("usera@example.com");
+        var (userBId, rawTokenB) = await SeedUserWithValidToken("userb@example.com");
+
+        // Act
+        var response = await _rawClient.PostAsync(
+            $"/api/account/confirm-email?userId={userAId}&token={Uri.EscapeDataString(rawTokenB)}",
+            content: null);
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.BadRequest);
+
+        var userA = await QueryUserAsync("usera@example.com");
+        var userB = await QueryUserAsync("userb@example.com");
+        Assert.NotNull(userA);
+        Assert.NotNull(userB);
+        Assert.False(userA.EmailConfirmed);
+        Assert.False(userB.EmailConfirmed);
+
+        var tokenB = await QueryTokenAsync(userBId);
+        Assert.NotNull(tokenB);
+        Assert.Null(tokenB.UsedAt);
+    }
+
+    [Fact]
+    public async Task FailedConfirmation_WrongToken_DoesNotConfirmUserOrMarkTokenUsedOrIssueCookie()
+    {
+        // Arrange
+        var (userId, _) = await SeedUserWithValidToken("pending@example.com");
+
+        // Act
+        var response = await _rawClient.PostAsync(
+            $"/api/account/confirm-email?userId={userId}&token=invalid-token",
+            content: null);
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.BadRequest);
+
+        Assert.False(
+            response.Headers.TryGetValues("Set-Cookie", out var cookieValues) &&
+            cookieValues.Any(v => v.StartsWith("SampleTwitter.Auth=")));
+
+        var user = await QueryUserAsync("pending@example.com");
+        Assert.NotNull(user);
+        Assert.False(user.EmailConfirmed);
+
+        var token = await QueryTokenAsync(userId);
+        Assert.NotNull(token);
+        Assert.Null(token.UsedAt);
+    }
+
+    [Fact]
+    public async Task ValidToken_IssuedCookieCanAccessProtectedEndpoints()
+    {
+        // Arrange
+        var (userId, rawToken) = await SeedUserWithValidToken("confirmed@example.com");
+
+        // Act
+        var confirmResponse = await _rawClient.PostAsync(
+            $"/api/account/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
+            content: null);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
+        Assert.True(confirmResponse.Headers.TryGetValues("Set-Cookie", out var cookieValues));
+        var authCookie = cookieValues.First(v => v.StartsWith("SampleTwitter.Auth=")).Split(';')[0];
+
+        // Act
+        var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/account/me")
+        {
+            Headers = { { "Cookie", authCookie } }
+        };
+        var meResponse = await _rawClient.SendAsync(meRequest);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
+        var meBody = await meResponse.Content.ReadFromJsonAsync<MeResponse>();
+        Assert.NotNull(meBody);
+        Assert.Equal(userId, meBody.Id);
+        Assert.Equal("confirmed@example.com", meBody.Email);
+    }
+
+    [Fact]
+    public async Task EmptyToken_Returns400WithProblemDetails()
+    {
+        // Arrange
+        var (userId, _) = await SeedUserWithValidToken("user@example.com");
+
+        // Act
+        var response = await _rawClient.PostAsync(
+            $"/api/account/confirm-email?userId={userId}&token=",
+            content: null);
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task SupersededToken_AfterResend_Returns400AndNewTokenReturns200()
+    {
+        // Arrange
+        await Client.PostAsJsonAsync("/api/account/signup",
+            new SignUpRequest { Email = "resend@example.com", Password = "Sup3rSecret1!" });
+
+        var firstEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
+        var firstConfirmUrl = ExtractConfirmationUrl(firstEmail.HtmlBody);
+        Factory.FakeEmailSender.Clear();
+
+        await Client.PostAsJsonAsync("/api/account/signup",
+            new SignUpRequest { Email = "resend@example.com", Password = "Sup3rSecret1!" });
+
+        var secondEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
+        var secondConfirmUrl = ExtractConfirmationUrl(secondEmail.HtmlBody);
+
+        // Act
+        var firstResponse = await _rawClient.PostAsync(firstConfirmUrl, content: null);
+
+        // Assert
+        await firstResponse.AssertProblemDetails(HttpStatusCode.BadRequest);
+
+        // Act
+        var secondResponse = await _rawClient.PostAsync(secondConfirmUrl, content: null);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var user = await QueryUserAsync("resend@example.com");
+        Assert.NotNull(user);
+        Assert.True(user.EmailConfirmed);
+    }
+    
+    private async Task<(long UserId, string RawToken)> SeedUserWithValidToken(
+        string email,
+        string? rawToken = null)
+    {
+        rawToken ??= $"integration-test-raw-token-{Guid.NewGuid():N}";
 
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
@@ -244,5 +380,15 @@ public class ConfirmEmailTests : IntegrationTestBase
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
         return Convert.ToHexString(bytes);
+    }
+
+    private static string ExtractConfirmationUrl(string htmlBody)
+    {
+        var hrefStart = htmlBody.IndexOf("href=\"", StringComparison.Ordinal) + 6;
+        var hrefEnd = htmlBody.IndexOf("\"", hrefStart, StringComparison.Ordinal);
+        var fullUrl = htmlBody[hrefStart..hrefEnd];
+
+        var uri = new Uri(fullUrl.Replace("&amp;", "&"));
+        return $"/api/account/confirm-email{uri.Query}";
     }
 }

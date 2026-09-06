@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +19,10 @@ public class SignUpTests : IntegrationTestBase
     {
         { new { Password = "Sup3rSecret1!" },                                      "Email"    },
         { new { Email    = "user@example.com" },                                   "Password" },
-        { new SignUpRequest { Email = "new@example.com", Password = "short" },     "Password" }
+        { new SignUpRequest { Email = "new@example.com", Password = "short" },     "Password" },
+        { new { Email = "not-an-email", Password = "Sup3rSecret1!" },              "Email"    },
+        { new { Email = "", Password = "Sup3rSecret1!" },                          "Email"    },
+        { new { Email = "user@example.com", Password = "" },                       "Password" }
     };
 
     [Theory]
@@ -27,6 +30,8 @@ public class SignUpTests : IntegrationTestBase
     public async Task InvalidRequest_Returns400WithValidationProblemDetailsNamingTheOffendingField(
         object requestBody, string expectedInvalidField)
     {
+        // Arrange - requestBody provided by MemberData
+
         // Act
         var response = await Client.PostAsJsonAsync("/api/account/signup", requestBody);
 
@@ -151,6 +156,77 @@ public class SignUpTests : IntegrationTestBase
 
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task NewEmail_DoesNotIssueAuthCookie()
+    {
+        // Arrange
+        var request = new SignUpRequest { Email = "nocookie@example.com", Password = "Sup3rSecret1!" };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.False(
+            response.Headers.TryGetValues("Set-Cookie", out var cookieValues) &&
+            cookieValues.Any(v => v.StartsWith("SampleTwitter.Auth=")));
+    }
+
+    [Fact]
+    public async Task NewEmail_WithExactly8CharacterPassword_Returns201()
+    {
+        // Arrange — 8 characters is the minimum valid length
+        var request = new SignUpRequest { Email = "boundary@example.com", Password = "12345678" };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var user = await QueryUserAsync("boundary@example.com");
+        Assert.NotNull(user);
+    }
+
+    [Fact]
+    public async Task NewEmail_PersistsEmailConfirmationTokenInDatabase()
+    {
+        // Arrange
+        var request = new SignUpRequest { Email = "tokencheck@example.com", Password = "Sup3rSecret1!" };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var user = await QueryUserAsync("tokencheck@example.com");
+        Assert.NotNull(user);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var token = await db.EmailConfirmationTokens.SingleOrDefaultAsync(t => t.UserId == user.Id);
+
+        Assert.NotNull(token);
+        Assert.False(string.IsNullOrWhiteSpace(token.TokenHash));
+        Assert.Null(token.UsedAt);
+        Assert.True(token.ExpiresAt > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task InvalidRequest_DoesNotPersistUserInDatabase()
+    {
+        // Arrange
+        var request = new SignUpRequest { Email = "invaliduser@example.com", Password = "sh" };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var user = await QueryUserAsync("invaliduser@example.com");
+        Assert.Null(user);
     }
 
     private async Task SeedConfirmedUser(string email, string passwordHash)
