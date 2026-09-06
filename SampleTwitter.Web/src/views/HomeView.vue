@@ -9,6 +9,7 @@ const activeTab = ref<'forYou' | 'following'>('forYou');
 
 interface TweetItem {
   id: number;
+  userId?: number;
   author: string;
   handle: string;
   avatar: string;
@@ -22,7 +23,7 @@ interface TweetItem {
 
 const tweets = ref<TweetItem[]>([
   {
-    id: 1,
+    id: -1,
     author: 'ASP.NET Core',
     handle: '@dotnet',
     avatar: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=80&auto=format&fit=crop&q=80',
@@ -33,7 +34,7 @@ const tweets = ref<TweetItem[]>([
     replies: 5
   },
   {
-    id: 2,
+    id: -2,
     author: 'Vue.js',
     handle: '@vuejs',
     avatar: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=80&auto=format&fit=crop&q=80',
@@ -45,11 +46,27 @@ const tweets = ref<TweetItem[]>([
   }
 ]);
 
+function isMyTweet(tweet: TweetItem): boolean {
+  if (!authStore.isAuthenticated) return false;
+  const currentId = authStore.currentUserId ?? (localStorage.getItem('sampletwitter_user_id') ? Number(localStorage.getItem('sampletwitter_user_id')) : null);
+  const currentEmail = authStore.currentUserEmail || localStorage.getItem('sampletwitter_user_email');
+  if (tweet.userId !== undefined && currentId !== null && Number(tweet.userId) === Number(currentId)) {
+    return true;
+  }
+  if (currentEmail && tweet.handle === currentEmail) {
+    return true;
+  }
+  return false;
+}
+
 function handleNewTweet(post: { id: number; text?: string; imageUrl?: string }) {
+  const currentId = authStore.currentUserId ?? (localStorage.getItem('sampletwitter_user_id') ? Number(localStorage.getItem('sampletwitter_user_id')) : undefined);
+  const currentEmail = authStore.currentUserEmail || localStorage.getItem('sampletwitter_user_email') || '@me';
   tweets.value.unshift({
     id: post.id,
-    author: `User #${authStore.currentUserId || 'Me'}`,
-    handle: authStore.currentUserEmail || '@me',
+    userId: currentId,
+    author: `User #${currentId || 'Me'}`,
+    handle: currentEmail,
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80',
     content: post.text || '',
     imageUrl: post.imageUrl,
@@ -58,6 +75,18 @@ function handleNewTweet(post: { id: number; text?: string; imageUrl?: string }) 
     retweets: 0,
     replies: 0
   });
+}
+
+function handleTweetUpdated(post: { id: number; text?: string; imageUrl?: string }) {
+  const tweet = tweets.value.find(t => t.id === post.id);
+  if (tweet) {
+    tweet.content = post.text || '';
+    tweet.imageUrl = post.imageUrl;
+  }
+}
+
+function handleDeleteTweet(id: number) {
+  tweets.value = tweets.value.filter(t => t.id !== id);
 }
 </script>
 
@@ -94,7 +123,10 @@ function handleNewTweet(post: { id: number; text?: string; imageUrl?: string }) 
     <div class="flex flex-col">
       <TweetCard
         v-for="tweet in tweets"
-        :key="tweet.id"
+        :key="'tweet-' + tweet.id"
+        :id="tweet.id"
+        :user-id="tweet.userId"
+        :can-edit="isMyTweet(tweet)"
         :author="tweet.author"
         :handle="tweet.handle"
         :avatar="tweet.avatar"
@@ -104,8 +136,10 @@ function handleNewTweet(post: { id: number; text?: string; imageUrl?: string }) 
         :likes="tweet.likes"
         :retweets="tweet.retweets"
         :replies="tweet.replies"
+        @updated="handleTweetUpdated"
+        @delete="handleDeleteTweet"
       />
     </div>
   </main>
-</template>
 
+</template>

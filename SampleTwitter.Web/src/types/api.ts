@@ -40,6 +40,17 @@ export interface CreatePostResponse {
   message: string;
 }
 
+export interface EditPostRequest {
+  text?: string;
+  imageUrl?: string;
+}
+
+export interface EditPostResponse {
+  postId: number;
+  message: string;
+}
+
+
 export interface ProblemDetails {
   type?: string;
   title?: string;
