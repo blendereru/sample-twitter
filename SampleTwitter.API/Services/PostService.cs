@@ -16,7 +16,7 @@ public class PostService : IPostService
         _applicationContext = applicationContext;
         _logger = logger;
     }
-    
+
     public async Task<Post> Create(CreatePostRequest request, long userId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
@@ -44,10 +44,10 @@ public class PostService : IPostService
             CreatedAt = DateTimeOffset.UtcNow,
             UserId = userId
         };
-        
+
         _applicationContext.Posts.Add(post);
         await _applicationContext.SaveChangesAsync(ct);
-        
+
         _logger.LogInformation("Post {PostId} created by user {UserId}", post.Id, userId);
 
         return post;
@@ -55,6 +55,11 @@ public class PostService : IPostService
 
     public async Task<Post> Edit(long postId, EditPostRequest request, long userId, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
+        {
+            throw new EmptyPostException("User attempted to edit a post to have no text and no image.");
+        }
+
         var post = await _applicationContext.Posts
             .SingleOrDefaultAsync(p => p.Id == postId, ct);
 
@@ -68,11 +73,6 @@ public class PostService : IPostService
         {
             _logger.LogWarning("Edit forbidden — user {UserId} does not own post {PostId}", userId, postId);
             throw new ForbiddenException($"User {userId} attempted to edit post {postId} owned by user {post.UserId}.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
-        {
-            throw new EmptyPostException("User attempted to edit a post to have no text and no image.");
         }
 
         post.Text = request.Text?.Trim();

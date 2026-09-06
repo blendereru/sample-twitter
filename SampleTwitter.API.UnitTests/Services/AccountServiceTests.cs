@@ -30,7 +30,7 @@ public class AccountServiceTests : IDisposable
             _passwordHasherMock.Object,
             NullLogger<AccountService>.Instance);
     }
-    
+
     [Fact]
     public async Task Register_NewUser_CallsSendConfirmationEmailWithNormalizedEmail()
     {
@@ -47,7 +47,7 @@ public class AccountServiceTests : IDisposable
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
-    
+
     [Fact]
     public async Task Register_NewUser_DelegatesHashingToPasswordHasher()
     {
@@ -60,7 +60,7 @@ public class AccountServiceTests : IDisposable
         // Assert
         _passwordHasherMock.Verify(h => h.Hash("Sup3rSecret1!"), Times.Once);
     }
-    
+
     [Fact]
     public async Task Register_ConfirmedUserExists_NeverCallsSendConfirmationEmail()
     {
@@ -72,16 +72,15 @@ public class AccountServiceTests : IDisposable
         });
         await _applicationContext.SaveChangesAsync();
 
-        // Act
-        try { await _sut.Register(new SignUpRequest { Email = "existing@example.com", Password = "P@ss1" }); }
-        catch (ConflictException) { }
+        // Act & Assert
+        await Assert.ThrowsAsync<ConflictException>(
+            () => _sut.Register(new SignUpRequest { Email = "existing@example.com", Password = "P@ss1" }));
 
-        // Assert
         _emailConfirmationServiceMock.Verify(
             s => s.SendConfirmationEmail(It.IsAny<User>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
-    
+
     [Fact]
     public async Task Register_UnconfirmedUserExists_HashesTheNewPassword()
     {
@@ -99,6 +98,7 @@ public class AccountServiceTests : IDisposable
         // Assert
         _passwordHasherMock.Verify(h => h.Hash("NewP@ss1!"), Times.Once);
     }
+
     [Fact]
     public async Task Login_ValidCredentials_ReturnsLoginResultWithCorrectUserIdAndEmail()
     {
