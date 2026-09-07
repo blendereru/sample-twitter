@@ -4,6 +4,7 @@ using SampleTwitter.API.DTOs.ResponseDTOs;
 
 namespace SampleTwitter.API.Controllers;
 
+[Tags("Users")]
 [Route("api/users")]
 [ApiController]
 public class UsersController : ControllerBase

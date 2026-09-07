@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SampleTwitter.API.DTOs.RequestDTOs;
 
+/// <summary>
+/// Credentials for registering a new account.
+/// </summary>
 public class SignUpRequest
 {
     [Required]

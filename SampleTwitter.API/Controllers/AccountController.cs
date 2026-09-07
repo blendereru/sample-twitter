@@ -8,6 +8,7 @@ using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 
 namespace SampleTwitter.API.Controllers;
+[Tags("Account")]
 [Route("api/account")]
 [ApiController]
 public class AccountController : ControllerBase

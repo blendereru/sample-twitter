@@ -7,6 +7,7 @@ using SampleTwitter.API.DTOs.ResponseDTOs;
 
 namespace SampleTwitter.API.Controllers;
 
+[Tags("Posts")]
 [Route("api/posts")]
 [ApiController]
 public class PostController : ControllerBase
