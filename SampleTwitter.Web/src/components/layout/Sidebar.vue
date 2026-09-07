@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Home, Hash, Bell, Mail, Bookmark, User, Twitter, Feather, LogIn, UserPlus, LogOut } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
@@ -7,14 +8,18 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const navItems = [
+const profilePath = computed(() => {
+  return authStore.currentUserId ? `/profile/${authStore.currentUserId}` : '/profile';
+});
+
+const navItems = computed(() => [
   { name: 'Home', path: '/', icon: Home },
   { name: 'Explore', path: '/#explore', icon: Hash },
   { name: 'Notifications', path: '/#notifications', icon: Bell },
   { name: 'Messages', path: '/#messages', icon: Mail },
   { name: 'Bookmarks', path: '/#bookmarks', icon: Bookmark },
-  { name: 'Profile', path: '/#profile', icon: User },
-];
+  { name: 'Profile', path: profilePath.value, icon: User },
+]);
 
 function handleLogout() {
   authStore.clearAuth();
@@ -78,15 +83,15 @@ function handleLogout() {
     </div>
 
     <div v-if="authStore.isAuthenticated" class="p-2 rounded-full hover:bg-neutral-800/60 flex items-center justify-between transition-colors">
-      <div class="flex items-center gap-3">
+      <router-link :to="profilePath" class="flex items-center gap-3 flex-1 min-w-0">
         <div class="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-sky-400 shrink-0">
           U
         </div>
-        <div class="hidden xl:flex flex-col text-sm">
-          <span class="font-bold text-white">User #{{ authStore.currentUserId }}</span>
+        <div class="hidden xl:flex flex-col text-sm truncate">
+          <span class="font-bold text-white truncate">User #{{ authStore.currentUserId }}</span>
           <span class="text-neutral-500 text-xs truncate max-w-[120px]">{{ authStore.currentUserEmail || 'Signed in' }}</span>
         </div>
-      </div>
+      </router-link>
       <button
         @click="handleLogout"
         title="Sign out"

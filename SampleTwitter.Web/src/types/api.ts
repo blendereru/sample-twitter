@@ -50,6 +50,25 @@ export interface EditPostResponse {
   message: string;
 }
 
+export interface PostAuthorDto {
+  id: number;
+  email: string;
+}
+
+export interface PostFeedItemDto {
+  id: number;
+  text?: string;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt?: string;
+  author: PostAuthorDto;
+  parentPost?: PostFeedItemDto;
+}
+
+export interface PostFeedResponse {
+  items: PostFeedItemDto[];
+}
+
 
 export interface ProblemDetails {
   type?: string;

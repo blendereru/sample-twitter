@@ -3,6 +3,7 @@ import HomeView from '@/views/HomeView.vue';
 import SignUpView from '@/views/SignUpView.vue';
 import LoginView from '@/views/LoginView.vue';
 import ConfirmEmailView from '@/views/ConfirmEmailView.vue';
+import ProfileView from '@/views/ProfileView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -26,6 +27,19 @@ const router = createRouter({
       path: '/confirm-email',
       name: 'confirm-email',
       component: ConfirmEmailView,
+    },
+    {
+      path: '/profile/:id',
+      name: 'user-profile',
+      component: ProfileView,
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      redirect: () => {
+        const storedUserId = localStorage.getItem('sampletwitter_user_id');
+        return storedUserId ? `/profile/${storedUserId}` : '/login';
+      },
     },
   ],
 });

@@ -91,7 +91,7 @@ public class PostService : IPostService
         long userId,
         CancellationToken ct = default)
     {
-        if(await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
+        if(!await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
         {
             _logger.LogWarning("Profile feed requested for non-existent user {UserId}", userId);
             throw new UserNotFoundException($"User with id {userId} was not found.");
