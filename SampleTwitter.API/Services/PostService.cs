@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
+using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
 
@@ -85,4 +86,39 @@ public class PostService : IPostService
 
         return post;
     }
+
+    public async Task<PostFeedResponse> GetProfileFeed(
+        long userId,
+        CancellationToken ct = default)
+    {
+        if(await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
+        {
+            _logger.LogWarning("Profile feed requested for non-existent user {UserId}", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        var items = await _applicationContext.Posts
+            .AsNoTracking()
+            .Include(p => p.User)
+            .Include(p => p.Reply!)
+            .ThenInclude(r => r.User)
+            .Where(p => p.UserId == userId
+                        && (p.ReplyId == null || p.Reply!.UserId == userId))
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .ToListAsync(ct);
+
+        return new PostFeedResponse(items.Select(MapToFeedItem).ToList());
+    }
+
+    private static PostFeedItemDto MapToFeedItem(Post post) =>
+        new(
+            post.Id,
+            post.Text,
+            post.ImageUrl,
+            post.CreatedAt,
+            post.UpdatedAt,
+            new PostAuthorDto(post.User.Id, post.User.Email),
+            post.Reply is not null ? MapToFeedItem(post.Reply) : null
+        );
 }
