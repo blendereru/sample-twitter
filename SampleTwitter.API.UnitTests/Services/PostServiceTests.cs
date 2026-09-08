@@ -55,6 +55,108 @@ public class PostServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_NullTextAndWhitespaceImage_ThrowsEmptyPostException()
+    {
+        // Arrange
+        var request = new CreatePostRequest { Text = null, ImageUrl = "   " };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<EmptyPostException>(
+            () => _sut.Create(request, userId: 1));
+    }
+
+    [Fact]
+    public async Task Create_WhitespaceTextAndWhitespaceImage_ThrowsEmptyPostException()
+    {
+        // Arrange
+        var request = new CreatePostRequest { Text = "   ", ImageUrl = "   " };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<EmptyPostException>(
+            () => _sut.Create(request, userId: 1));
+    }
+
+    [Fact]
+    public async Task Create_NonExistentReplyId_ThrowsPostNotFoundException()
+    {
+        // Arrange
+        var request = new CreatePostRequest { Text = "valid text", ReplyId = 9999 };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(
+            () => _sut.Create(request, userId: 1));
+    }
+
+    [Fact]
+    public async Task Create_ExistingReplyId_SetsReplyIdCorrectly()
+    {
+        // Arrange
+        var parent = await SeedPost(userId: 1, text: "parent post");
+        var request = new CreatePostRequest { Text = "reply post", ReplyId = parent.Id };
+
+        // Act
+        var result = await _sut.Create(request, userId: 1);
+
+        // Assert
+        Assert.Equal(parent.Id, result.ReplyId);
+    }
+
+    [Fact]
+    public async Task Create_TextOnly_SetsPropertiesCorrectly()
+    {
+        // Arrange
+        var request = new CreatePostRequest { Text = "text only" };
+        var before = DateTimeOffset.UtcNow;
+
+        // Act
+        var result = await _sut.Create(request, userId: 42);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.Equal("text only", result.Text);
+        Assert.Null(result.ImageUrl);
+        Assert.Null(result.ReplyId);
+        Assert.Equal(42, result.UserId);
+        Assert.True(result.CreatedAt >= before);
+    }
+
+    [Fact]
+    public async Task Create_ImageOnly_SetsPropertiesCorrectly()
+    {
+        // Arrange
+        var request = new CreatePostRequest { ImageUrl = "https://example.com/pic.png" };
+
+        // Act
+        var result = await _sut.Create(request, userId: 42);
+
+        // Assert
+        Assert.True(result.Id > 0);
+        Assert.Null(result.Text);
+        Assert.Equal("https://example.com/pic.png", result.ImageUrl);
+        Assert.Null(result.ReplyId);
+        Assert.Equal(42, result.UserId);
+    }
+
+    [Fact]
+    public async Task Create_TextAndImage_SetsBoth()
+    {
+        // Arrange
+        var request = new CreatePostRequest
+        {
+            Text = "has text",
+            ImageUrl = "https://example.com/pic.png"
+        };
+
+        // Act
+        var result = await _sut.Create(request, userId: 42);
+
+        // Assert
+        Assert.Equal("has text", result.Text);
+        Assert.Equal("https://example.com/pic.png", result.ImageUrl);
+        Assert.Equal(42, result.UserId);
+    }
+
+    [Fact]
     public async Task Edit_NullTextAndNullImage_ThrowsEmptyPostException()
     {
         // Arrange
