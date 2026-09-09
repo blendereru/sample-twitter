@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
@@ -356,6 +357,73 @@ public class PostServiceTests : IDisposable
         Assert.Equal(1, item.Author.Id);
         Assert.Equal("alice@example.com", item.Author.Email);
         Assert.Null(item.ParentPost);
+    }
+
+    [Fact]
+    public async Task Delete_NonExistentPostId_ThrowsPostNotFoundException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(
+            () => _sut.Delete(postId: 9999, userId: 1));
+    }
+
+    [Fact]
+    public async Task Delete_DifferentUser_ThrowsForbiddenException()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "user 1 post");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ForbiddenException>(
+            () => _sut.Delete(postId: post.Id, userId: 2));
+    }
+
+    [Fact]
+    public async Task Delete_ValidPostAndOwner_SoftDeletesPostAndSetsDeletedAt()
+    {
+        // Arrange
+        var before = DateTimeOffset.UtcNow;
+        var post = await SeedPost(userId: 1, text: "user 1 post");
+
+        // Act
+        await _sut.Delete(postId: post.Id, userId: 1);
+
+        // Assert
+        var dbPost = await _applicationContext.Posts
+            .IgnoreQueryFilters()
+            .SingleAsync(p => p.Id == post.Id);
+
+        Assert.True(dbPost.IsDeleted);
+        Assert.NotNull(dbPost.DeletedAt);
+        Assert.True(dbPost.DeletedAt >= before);
+    }
+
+    [Fact]
+    public async Task Delete_AlreadyDeletedPost_ThrowsPostNotFoundException()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "user 1 post");
+        await _sut.Delete(postId: post.Id, userId: 1);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(
+            () => _sut.Delete(postId: post.Id, userId: 1));
+    }
+
+    [Fact]
+    public async Task Delete_SoftDeletedPost_ExcludedFromProfileFeed()
+    {
+        // Arrange
+        var post1 = await SeedPost(userId: 1, text: "active post");
+        var post2 = await SeedPost(userId: 1, text: "deleted post");
+        await _sut.Delete(postId: post2.Id, userId: 1);
+
+        // Act
+        var feed = await _sut.GetProfileFeed(userId: 1);
+
+        // Assert
+        var item = Assert.Single(feed.Items);
+        Assert.Equal(post1.Id, item.Id);
     }
 
     private async Task<Post> SeedPost(

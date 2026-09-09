@@ -111,6 +111,30 @@ public class PostService : IPostService
         return new PostFeedResponse(items.Select(MapToFeedItem).ToList());
     }
 
+    public async Task Delete(long postId, long userId, CancellationToken ct = default)
+    {
+        var post = await _applicationContext.Posts
+            .SingleOrDefaultAsync(p => p.Id == postId, ct);
+
+        if (post is null)
+        {
+            _logger.LogWarning("Delete failed — post {PostId} not found", postId);
+            throw new PostNotFoundException($"Post with id {postId} was not found.");
+        }
+
+        if (post.UserId != userId)
+        {
+            _logger.LogWarning("Delete forbidden — user {UserId} does not own post {PostId}", userId, postId);
+            throw new ForbiddenException($"User {userId} attempted to delete post {postId} owned by user {post.UserId}.");
+        }
+
+        post.IsDeleted = true;
+        post.DeletedAt = DateTimeOffset.UtcNow;
+        await _applicationContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Post {PostId} deleted by user {UserId}", post.Id, userId);
+    }
+
     private static PostFeedItemDto MapToFeedItem(Post post) =>
         new(
             post.Id,

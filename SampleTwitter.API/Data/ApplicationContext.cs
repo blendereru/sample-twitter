@@ -6,7 +6,7 @@ namespace SampleTwitter.API.Data;
 public class ApplicationContext : DbContext
 {
     public ApplicationContext(DbContextOptions<ApplicationContext> options) : base(options) { }
-    
+
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<EmailConfirmationToken> EmailConfirmationTokens { get; set; } = null!;
     public DbSet<Post> Posts { get; set; } = null!;
@@ -46,5 +46,7 @@ public class ApplicationContext : DbContext
 
             builder.Property(p => p.Text).HasMaxLength(280);
         });
+
+        modelBuilder.Entity<Post>().HasQueryFilter(p => !p.IsDeleted);
     }
 }
