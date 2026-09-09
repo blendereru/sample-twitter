@@ -13,6 +13,12 @@ jobs:
 
     steps:
       # -----------------------------------------------------------------------
+      # 0. Start Timer (Workflow runtime tracking)
+      # -----------------------------------------------------------------------
+      - name: Start timer
+        run: echo "WORKFLOW_START_TIME=$(date +%s)" >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
       # 1. Checkout
       # -----------------------------------------------------------------------
       - name: Checkout
@@ -65,6 +71,8 @@ jobs:
       # coverage.cobertura.xml file into a GUID-named subdirectory under
       # ./coverage. The GUID directory means this step and step 7 (integration
       # tests) can both write to ./coverage without overwriting each other.
+      # --logger "trx;LogFileName=unit-tests.trx" outputs machine-readable
+      # test metrics aggregated by the notification step.
       # -----------------------------------------------------------------------
       - name: Unit Tests
         run: >
@@ -72,6 +80,7 @@ jobs:
           --no-build
           --configuration Release
           --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=unit-tests.trx"
           --collect:"XPlat Code Coverage"
           --results-directory ./coverage
 
@@ -80,6 +89,7 @@ jobs:
       #
       # Same --collect flag. coverlet merges with the existing data at report
       # generation time (not here) -- both XML files are independent snapshots.
+      # --logger "trx;LogFileName=integration-tests.trx" outputs metrics.
       # -----------------------------------------------------------------------
       - name: Integration Tests
         env:
@@ -89,6 +99,7 @@ jobs:
           --no-build
           --configuration Release
           --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=integration-tests.trx"
           --collect:"XPlat Code Coverage"
           --results-directory ./coverage
 
@@ -161,6 +172,7 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 12. Send Telegram notification
+      # Sends a decorated HTML summary card to Telegram upon workflow finish.
       # Skips gracefully if secrets are not configured (e.g. in forks).
       # -----------------------------------------------------------------------
       - name: Send Telegram notification
@@ -169,6 +181,12 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           JOB_STATUS: ${{ job.status }}
+          COMMIT_RAW_MSG: ${{ github.event.head_commit.message }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "Telegram secrets (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID) are not configured. Skipping notification."
@@ -186,18 +204,99 @@ jobs:
             STATUS_TEXT="Cancelled"
           fi
 
-          COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -n 1 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Resolve commit / PR title with HTML escaping
+          if [ -n "$PR_TITLE" ]; then
+            COMMIT_RAW_MSG="$PR_TITLE"
+          elif [ -z "$COMMIT_RAW_MSG" ]; then
+            COMMIT_RAW_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "N/A")
+          fi
+          COMMIT_TITLE=$(echo "$COMMIT_RAW_MSG" | head -n 1 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+          RUN_URL="https://github.com/${GITHUB_REPO}/actions/runs/${GITHUB_RUN_ID}"
 
-          MESSAGE=$(cat <<EOF | sed 's/^[[:space:]]*//'
+          # Calculate workflow duration
+          if [ -n "$WORKFLOW_START_TIME" ]; then
+            DURATION=$(( $(date +%s) - WORKFLOW_START_TIME ))
+            MINUTES=$(( DURATION / 60 ))
+            SECONDS=$(( DURATION % 60 ))
+            if [ "$MINUTES" -gt 0 ]; then
+              DURATION_STR="${MINUTES}m ${SECONDS}s"
+            else
+              DURATION_STR="${SECONDS}s"
+            fi
+          else
+            DURATION_STR="N/A"
+          fi
+
+          # Aggregate test results from TRX files if available
+          read -r TESTS_TOTAL TESTS_PASSED TESTS_FAILED TESTS_SKIPPED <<< $(awk '
+            /<Counters / {
+              for (i = 1; i <= NF; i++) {
+                if ($i ~ /^total="[0-9]+"/) { split($i, a, "\""); total += a[2] }
+                if ($i ~ /^passed="[0-9]+"/) { split($i, a, "\""); passed += a[2] }
+                if ($i ~ /^(failed|error|timeout|aborted)="[0-9]+"/) { split($i, a, "\""); failed += a[2] }
+                if ($i ~ /^notExecuted="[0-9]+"/) { split($i, a, "\""); skipped += a[2] }
+              }
+            }
+            END { printf "%d %d %d %d\n", total, passed, failed, skipped }
+          ' ./coverage/*.trx 2>/dev/null)
+
+          TESTS_TOTAL=${TESTS_TOTAL:-0}
+          TESTS_PASSED=${TESTS_PASSED:-0}
+          TESTS_FAILED=${TESTS_FAILED:-0}
+          TESTS_SKIPPED=${TESTS_SKIPPED:-0}
+
+          if [ "$TESTS_TOTAL" -gt 0 ]; then
+            DETAILS=""
+            if [ "$TESTS_FAILED" -gt 0 ]; then
+              DETAILS="${TESTS_FAILED} failed"
+            fi
+            if [ "$TESTS_SKIPPED" -gt 0 ]; then
+              if [ -n "$DETAILS" ]; then
+                DETAILS="${DETAILS}, ${TESTS_SKIPPED} skipped"
+              else
+                DETAILS="${TESTS_SKIPPED} skipped"
+              fi
+            fi
+            if [ -n "$DETAILS" ]; then
+              TESTS_LINE="🧪 <b>Tests:</b> <code>${TESTS_PASSED}/${TESTS_TOTAL} passed (${DETAILS})</code>"
+            else
+              TESTS_LINE="🧪 <b>Tests:</b> <code>${TESTS_PASSED}/${TESTS_TOTAL} passed</code> (100%)"
+            fi
+          else
+            TESTS_LINE="🧪 <b>Tests:</b> <code>Not executed</code>"
+          fi
+
+          # Extract coverage metrics if report was generated
+          LINE_COVERAGE=""
+          BRANCH_COVERAGE=""
+          if [ -f "./coverage-report/SummaryGithub.md" ]; then
+            LINE_COVERAGE=$(grep -m 1 "Line coverage:" ./coverage-report/SummaryGithub.md 2>/dev/null | grep -oE "[0-9]+(\.[0-9]+)?%" || true)
+            BRANCH_COVERAGE=$(grep -m 1 "Branch coverage:" ./coverage-report/SummaryGithub.md 2>/dev/null | grep -oE "[0-9]+(\.[0-9]+)?%" || true)
+          fi
+
+          COVERAGE_LINE=""
+          if [ -n "$LINE_COVERAGE" ]; then
+            if [ -n "$BRANCH_COVERAGE" ]; then
+              COVERAGE_LINE="📊 <b>Coverage:</b> <code>${LINE_COVERAGE} line, ${BRANCH_COVERAGE} branch</code>"
+            else
+              COVERAGE_LINE="📊 <b>Coverage:</b> <code>${LINE_COVERAGE} line</code>"
+            fi
+          fi
+
+          # Format HTML message card
+          MESSAGE=$(cat <<EOF | sed 's/^[[:space:]]*//' | cat -s
           <b>${STATUS_ICON} CI Build ${STATUS_TEXT}</b>
 
-          <b>Repository:</b> <code>${{ github.repository }}</code>
-          <b>Branch:</b> <code>${{ github.ref_name }}</code>
-          <b>Author:</b> ${{ github.actor }}
-          <b>Commit:</b> ${COMMIT_MSG}
+          📁 <b>Repository:</b> <code>${GITHUB_REPO}</code>
+          🌿 <b>Branch:</b> <code>${GITHUB_REF}</code>
+          👤 <b>Author:</b> ${GITHUB_ACTOR}
+          💬 <b>Commit:</b> ${COMMIT_TITLE}
 
-          <a href="${RUN_URL}">View Workflow Run</a>
+          ⏱️ <b>Duration:</b> <code>${DURATION_STR}</code>
+          ${TESTS_LINE}
+          ${COVERAGE_LINE}
+
+          🔗 <a href="${RUN_URL}">View Workflow Run</a>
           EOF
           )
 
@@ -205,4 +304,4 @@ jobs:
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
             -d "parse_mode=HTML" \
             -d "disable_web_page_preview=true" \
-            --data-urlencode "text=${MESSAGE}"
+            --data-urlencode "text=${MESSAGE}" || echo "Failed to send Telegram notification"
