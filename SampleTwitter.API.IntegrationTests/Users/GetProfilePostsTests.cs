@@ -242,6 +242,8 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.Equal(user.Id, item.Author.Id);
         Assert.Equal("alice@example.com", item.Author.Email);
         Assert.Null(item.ParentPost);
+        Assert.False(item.IsRepost);
+        Assert.Null(item.RepostedBy);
     }
 
     [Fact]
@@ -254,6 +256,129 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.True(
             response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.NotFound,
             $"Expected 400 or 404, but got {response.StatusCode}");
+    }
+
+    [Fact]
+    public async Task UserRepostsAnotherUsersPost_AppearsInProfileFeed_WithIsRepostAndRepostedBy()
+    {
+        // Arrange
+        var author = await SeedUser("author@example.com", "Sup3rSecret1!");
+        var post = await SeedPost(userId: author.Id, text: "original post");
+
+        var reposter = await SeedUser("reposter@example.com", "Sup3rSecret1!");
+        await SeedRepost(postId: post.Id, userId: reposter.Id);
+
+        // Act
+        var response = await Client.GetAsync($"/api/users/{reposter.Id}/posts");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<PostFeedResponse>();
+        Assert.NotNull(body);
+        var item = Assert.Single(body.Items);
+
+        Assert.Equal(post.Id, item.Id);
+        Assert.Equal("original post", item.Text);
+        Assert.Equal(author.Id, item.Author.Id);
+        Assert.Equal("author@example.com", item.Author.Email);
+        Assert.True(item.IsRepost);
+        Assert.NotNull(item.RepostedBy);
+        Assert.Equal(reposter.Id, item.RepostedBy!.Id);
+        Assert.Equal("reposter@example.com", item.RepostedBy.Email);
+    }
+
+    [Fact]
+    public async Task UserSelfRepostsOwnPost_AppearsAtTopOfFeed_AndOriginalRemainsAtBottom()
+    {
+        // Arrange
+        var user = await SeedUser("selfreposter@example.com", "Sup3rSecret1!");
+        var t1 = DateTimeOffset.UtcNow.AddHours(-3);
+        var t2 = DateTimeOffset.UtcNow.AddHours(-2);
+        var t3 = DateTimeOffset.UtcNow.AddHours(-1);
+
+        var post1 = await SeedPost(userId: user.Id, text: "older post", createdAt: t1);
+        var post2 = await SeedPost(userId: user.Id, text: "middle post", createdAt: t2);
+        await SeedRepost(postId: post1.Id, userId: user.Id, createdAt: t3);
+
+        // Act
+        var response = await Client.GetAsync($"/api/users/{user.Id}/posts");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<PostFeedResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(3, body.Items.Count);
+
+        // Top item: Repost of post1 (effective date t3)
+        Assert.Equal(post1.Id, body.Items[0].Id);
+        Assert.True(body.Items[0].IsRepost);
+        Assert.NotNull(body.Items[0].RepostedBy);
+        Assert.Equal(user.Id, body.Items[0].RepostedBy!.Id);
+
+        // Middle item: post2 (effective date t2)
+        Assert.Equal(post2.Id, body.Items[1].Id);
+        Assert.False(body.Items[1].IsRepost);
+        Assert.Null(body.Items[1].RepostedBy);
+
+        // Bottom item: Original post1 (effective date t1)
+        Assert.Equal(post1.Id, body.Items[2].Id);
+        Assert.False(body.Items[2].IsRepost);
+        Assert.Null(body.Items[2].RepostedBy);
+    }
+
+    [Fact]
+    public async Task OtherUsersRepostOfMyPost_ExcludedFromMyProfileFeed()
+    {
+        // Arrange
+        var user1 = await SeedUser("user1@example.com", "Sup3rSecret1!");
+        var user2 = await SeedUser("user2@example.com", "Sup3rSecret1!");
+
+        var post1 = await SeedPost(userId: user1.Id, text: "my post");
+        await SeedRepost(postId: post1.Id, userId: user2.Id);
+
+        // Act - fetch user 1 feed
+        var response = await Client.GetAsync($"/api/users/{user1.Id}/posts");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<PostFeedResponse>();
+        Assert.NotNull(body);
+        var item = Assert.Single(body.Items);
+        Assert.Equal(post1.Id, item.Id);
+        Assert.False(item.IsRepost);
+        Assert.Null(item.RepostedBy);
+    }
+
+    [Fact]
+    public async Task RepostOfSoftDeletedPost_ExcludedFromProfileFeed()
+    {
+        // Arrange
+        var (author, authorCookie) = await SeedAndSignIn("author@example.com", "Sup3rSecret1!");
+        var post = await SeedPost(userId: author.Id, text: "to be deleted");
+
+        var reposter = await SeedUser("reposter@example.com", "Sup3rSecret1!");
+        await SeedRepost(postId: post.Id, userId: reposter.Id);
+
+        // Author deletes the post
+        var deleteMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{post.Id}")
+        {
+            Headers = { { "Cookie", authorCookie } }
+        };
+        var deleteResponse = await Client.SendAsync(deleteMessage);
+        deleteResponse.EnsureSuccessStatusCode();
+
+        // Act - fetch reposter feed
+        var response = await Client.GetAsync($"/api/users/{reposter.Id}/posts");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<PostFeedResponse>();
+        Assert.NotNull(body);
+        Assert.Empty(body.Items);
     }
 
     private async Task<User> SeedUser(string email, string password)
@@ -313,5 +438,21 @@ public class GetProfilePostsTests : IntegrationTestBase
         db.Posts.Add(post);
         await db.SaveChangesAsync();
         return post;
+    }
+
+    private async Task<Repost> SeedRepost(long postId, long userId, DateTimeOffset? createdAt = null)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+
+        var repost = new Repost
+        {
+            PostId = postId,
+            UserId = userId,
+            CreatedAt = createdAt ?? DateTimeOffset.UtcNow
+        };
+        db.Reposts.Add(repost);
+        await db.SaveChangesAsync();
+        return repost;
     }
 }

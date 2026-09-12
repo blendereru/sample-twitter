@@ -357,6 +357,8 @@ public class PostServiceTests : IDisposable
         Assert.Equal(1, item.Author.Id);
         Assert.Equal("alice@example.com", item.Author.Email);
         Assert.Null(item.ParentPost);
+        Assert.False(item.IsRepost);
+        Assert.Null(item.RepostedBy);
     }
 
     [Fact]
@@ -424,6 +426,207 @@ public class PostServiceTests : IDisposable
         // Assert
         var item = Assert.Single(feed.Items);
         Assert.Equal(post1.Id, item.Id);
+    }
+
+    [Fact]
+    public async Task Repost_NonExistentPost_ThrowsPostNotFoundException()
+    {
+        // Arrange
+        await SeedUser(userId: 1, email: "user1@example.com");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(
+            () => _sut.Repost(postId: 9999, userId: 1));
+    }
+
+    [Fact]
+    public async Task Repost_NonExistentUser_ThrowsUserNotFoundException()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "a post");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UserNotFoundException>(
+            () => _sut.Repost(postId: post.Id, userId: 9999));
+    }
+
+    [Fact]
+    public async Task Repost_ValidPostAndUser_CreatesRepostAndReturnsResult()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "a post");
+        await SeedUser(userId: 2, email: "user2@example.com");
+        var before = DateTimeOffset.UtcNow;
+
+        // Act
+        var result = await _sut.Repost(postId: post.Id, userId: 2);
+
+        // Assert
+        Assert.Equal(post.Id, result.PostId);
+        Assert.Equal(2, result.UserId);
+        Assert.True(result.CreatedAt >= before);
+
+        var dbRepost = await _applicationContext.Reposts
+            .SingleOrDefaultAsync(r => r.PostId == post.Id && r.UserId == 2);
+        Assert.NotNull(dbRepost);
+        Assert.Equal(post.Id, dbRepost.PostId);
+        Assert.Equal(2, dbRepost.UserId);
+    }
+
+    [Fact]
+    public async Task Repost_AlreadyReposted_ThrowsAlreadyRepostedException()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "a post");
+        await SeedUser(userId: 2, email: "user2@example.com");
+
+        await _sut.Repost(postId: post.Id, userId: 2);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<AlreadyRepostedException>(
+            () => _sut.Repost(postId: post.Id, userId: 2));
+    }
+
+    [Fact]
+    public async Task Repost_SoftDeletedPost_ThrowsPostNotFoundException()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "a post");
+        await SeedUser(userId: 2, email: "user2@example.com");
+        await _sut.Delete(postId: post.Id, userId: 1);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(
+            () => _sut.Repost(postId: post.Id, userId: 2));
+    }
+
+    [Fact]
+    public async Task GetProfileFeed_UserHasReposts_IncludesRepostsOrderedByRepostCreatedAt()
+    {
+        // Arrange
+        var now = DateTimeOffset.UtcNow;
+        var t1 = now.AddHours(-3);
+        var t2 = now.AddHours(-2);
+        var t3 = now.AddHours(-1);
+
+        var post1 = await SeedPost(userId: 1, text: "user 1 original post", createdAt: t1);
+        var post2 = await SeedPost(userId: 2, text: "user 2 original post", createdAt: t2);
+        var repost = await SeedRepost(postId: post2.Id, userId: 1, createdAt: t3);
+
+        // Act
+        var result = await _sut.GetProfileFeed(userId: 1);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+
+        var first = result.Items[0];
+        Assert.Equal(post2.Id, first.Id);
+        Assert.Equal("user 2 original post", first.Text);
+        Assert.Equal(post2.CreatedAt, first.CreatedAt);
+        Assert.Equal(2, first.Author.Id);
+        Assert.True(first.IsRepost);
+        Assert.NotNull(first.RepostedBy);
+        Assert.Equal(1, first.RepostedBy!.Id);
+
+        var second = result.Items[1];
+        Assert.Equal(post1.Id, second.Id);
+        Assert.Equal("user 1 original post", second.Text);
+        Assert.Equal(post1.CreatedAt, second.CreatedAt);
+        Assert.Equal(1, second.Author.Id);
+        Assert.False(second.IsRepost);
+        Assert.Null(second.RepostedBy);
+    }
+
+    [Fact]
+    public async Task GetProfileFeed_UserSelfReposts_AppearsTwiceInFeed()
+    {
+        // Arrange
+        var now = DateTimeOffset.UtcNow;
+        var t1 = now.AddHours(-3);
+        var t2 = now.AddHours(-2);
+        var t3 = now.AddHours(-1);
+
+        var post1 = await SeedPost(userId: 1, text: "first post", createdAt: t1);
+        var post2 = await SeedPost(userId: 1, text: "second post", createdAt: t2);
+        await SeedRepost(postId: post1.Id, userId: 1, createdAt: t3);
+
+        // Act
+        var result = await _sut.GetProfileFeed(userId: 1);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.Items.Count);
+
+        // 1st: Self-repost of post1 (at t3)
+        Assert.Equal(post1.Id, result.Items[0].Id);
+        Assert.True(result.Items[0].IsRepost);
+        Assert.NotNull(result.Items[0].RepostedBy);
+        Assert.Equal(1, result.Items[0].RepostedBy.Id);
+
+        // 2nd: post2 (at t2)
+        Assert.Equal(post2.Id, result.Items[1].Id);
+        Assert.False(result.Items[1].IsRepost);
+        Assert.Null(result.Items[1].RepostedBy);
+
+        // 3rd: Original post1 (at t1)
+        Assert.Equal(post1.Id, result.Items[2].Id);
+        Assert.False(result.Items[2].IsRepost);
+        Assert.Null(result.Items[2].RepostedBy);
+    }
+
+    [Fact]
+    public async Task GetProfileFeed_RepostOfDeletedPost_ExcludedFromFeed()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 2, text: "post to be deleted");
+        await SeedRepost(postId: post.Id, userId: 1);
+        await _sut.Delete(postId: post.Id, userId: 2);
+
+        // Act
+        var result = await _sut.GetProfileFeed(userId: 1);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetProfileFeed_OtherUsersReposts_ExcludedFromUserFeed()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "author post");
+        await SeedRepost(postId: post.Id, userId: 2);
+
+        // Act & Assert for user 1 (should only see their original post)
+        var user1Feed = await _sut.GetProfileFeed(userId: 1);
+        var user1Item = Assert.Single(user1Feed.Items);
+        Assert.Equal(post.Id, user1Item.Id);
+        Assert.False(user1Item.IsRepost);
+        Assert.Null(user1Item.RepostedBy);
+
+        // Act & Assert for user 2 (should see the repost)
+        var user2Feed = await _sut.GetProfileFeed(userId: 2);
+        var user2Item = Assert.Single(user2Feed.Items);
+        Assert.Equal(post.Id, user2Item.Id);
+        Assert.True(user2Item.IsRepost);
+        Assert.NotNull(user2Item.RepostedBy);
+        Assert.Equal(2, user2Item.RepostedBy.Id);
+    }
+
+    private async Task<Repost> SeedRepost(long postId, long userId, DateTimeOffset? createdAt = null)
+    {
+        await SeedUser(userId, $"user{userId}@example.com");
+
+        var repost = new Repost
+        {
+            PostId = postId,
+            UserId = userId,
+            CreatedAt = createdAt ?? DateTimeOffset.UtcNow
+        };
+        _applicationContext.Reposts.Add(repost);
+        await _applicationContext.SaveChangesAsync();
+        return repost;
     }
 
     private async Task<Post> SeedPost(

@@ -7,4 +7,5 @@ public class User
     public string PasswordHash { get; set; }
     public bool EmailConfirmed { get; set; } = false;
     public DateTimeOffset RegisteredAt { get; set; }
+    public List<Repost> Reposts { get; set; } = new();
 }

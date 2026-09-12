@@ -52,6 +52,12 @@ export interface EditPostResponse {
   updatedAt?: string;
 }
 
+export interface RepostResponse {
+  postId: number;
+  userId: number;
+  createdAt: string;
+}
+
 export interface PostAuthorDto {
   id: number;
   email: string;
@@ -65,6 +71,8 @@ export interface PostFeedItemDto {
   updatedAt?: string;
   author: PostAuthorDto;
   parentPost?: PostFeedItemDto;
+  isRepost: boolean;
+  repostedBy?: PostAuthorDto;
 }
 
 export interface PostFeedResponse {

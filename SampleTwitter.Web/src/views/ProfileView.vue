@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare } from 'lucide-vue-next';
+import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare, Repeat2 } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import { getUserPosts } from '@/api/users';
 import { parseApiError } from '@/api/client';
@@ -35,7 +35,8 @@ const profileEmail = computed(() => {
     return authStore.currentUserEmail;
   }
   if (posts.value.length > 0) {
-    return posts.value[0].author.email;
+    const first = posts.value[0];
+    return first.isRepost && first.repostedBy ? first.repostedBy.email : first.author.email;
   }
   return `user${targetUserId.value}@example.com`;
 });
@@ -45,7 +46,9 @@ const profileDisplayName = computed(() => {
     return authStore.currentUserEmail.split('@')[0];
   }
   if (posts.value.length > 0) {
-    return posts.value[0].author.email.split('@')[0];
+    const first = posts.value[0];
+    const email = first.isRepost && first.repostedBy ? first.repostedBy.email : first.author.email;
+    return email.split('@')[0];
   }
   return `User #${targetUserId.value}`;
 });
@@ -365,9 +368,15 @@ watch(
       <div v-else class="flex flex-col">
         <div
           v-for="post in posts"
-          :key="'feed-post-' + post.id"
+          :key="(post.isRepost ? 'feed-repost-' : 'feed-post-') + post.id"
           class="flex flex-col border-b border-neutral-800"
         >
+          <!-- Repost Context Badge -->
+          <div v-if="post.isRepost" class="px-4 pt-2.5 flex items-center gap-2 text-xs font-semibold text-neutral-500">
+            <Repeat2 class="w-3.5 h-3.5 text-neutral-500" />
+            <span>{{ isMyProfile ? 'You reposted' : `${post.repostedBy?.email.split('@')[0] ?? 'User'} reposted` }}</span>
+          </div>
+
           <!-- Self-thread parent post context if present -->
           <div v-if="post.parentPost" class="relative bg-neutral-950/20">
             <div class="px-4 pt-2.5 flex items-center gap-2 text-xs text-neutral-500">
@@ -411,7 +420,7 @@ watch(
             :image-url="post.imageUrl"
             :timestamp="formatDate(post.createdAt)"
             :updated-at="post.updatedAt"
-            :can-edit="isMyProfile || (authStore.currentUserId !== null && Number(authStore.currentUserId) === post.author.id)"
+            :can-edit="!post.isRepost && (isMyProfile || (authStore.currentUserId !== null && Number(authStore.currentUserId) === post.author.id))"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
             class="!border-b-0"

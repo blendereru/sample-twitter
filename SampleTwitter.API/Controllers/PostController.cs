@@ -110,6 +110,35 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
+    /// Reposts an existing post for the authenticated user.
+    /// </summary>
+    /// <param name="id">The ID of the post to repost.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The post was reposted successfully; returns the repost representation.</response>
+    /// <response code="400">The request is invalid (e.g. invalid post ID format).</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">No post exists with the given ID.</response>
+    /// <response code="409">The authenticated user has already reposted this post.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpPost("{id}/repost")]
+    [ProducesResponseType(typeof(RepostResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Repost(long id, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = long.Parse(userIdClaim!);
+
+        var result = await _postService.Repost(id, userId, ct);
+
+        return Ok(new RepostResponse(result.PostId, result.UserId, result.CreatedAt));
+    }
+
+    /// <summary>
     /// Retrieves a post by its ID.
     /// </summary>
     /// <response code="200">The post was found.</response>

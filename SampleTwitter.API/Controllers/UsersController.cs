@@ -18,9 +18,9 @@ public class UsersController : ControllerBase
 
     /// <summary>
     /// Returns the profile Posts feed for the given user.
-    /// Includes the user's own top-level posts and replies to their own posts (self-threads).
+    /// Includes the user's own top-level posts, replies to their own posts (self-threads), and reposts made by the user.
     /// Replies to other users' posts are excluded (those belong to the Replies tab).
-    /// Results are ordered newest first.
+    /// Results are ordered newest first by activity timestamp.
     /// </summary>
     /// <param name="userId">The ID of the user whose feed to retrieve.</param>
     /// <param name="ct">Cancellation token.</param>

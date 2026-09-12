@@ -102,24 +102,54 @@ public class PostService : IPostService
         long userId,
         CancellationToken ct = default)
     {
-        if(!await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
+        if (!await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
         {
             _logger.LogWarning("Profile feed requested for non-existent user {UserId}", userId);
             throw new UserNotFoundException($"User with id {userId} was not found.");
         }
 
-        var items = await _applicationContext.Posts
+        var authoredPosts = await _applicationContext.Posts
             .AsNoTracking()
             .Include(p => p.User)
             .Include(p => p.Reply!)
-            .ThenInclude(r => r.User)
+                .ThenInclude(r => r.User)
             .Where(p => p.UserId == userId
                         && (p.ReplyId == null || p.Reply!.UserId == userId))
-            .OrderByDescending(p => p.CreatedAt)
-            .ThenByDescending(p => p.Id)
             .ToListAsync(ct);
 
-        return new PostFeedResult(items.Select(MapToFeedItem).ToList());
+        var reposts = await _applicationContext.Reposts
+            .AsNoTracking()
+            .Include(r => r.User)
+            .Include(r => r.Post)
+                .ThenInclude(p => p.User)
+            .Include(r => r.Post)
+                .ThenInclude(p => p.Reply!)
+                    .ThenInclude(r => r.User)
+            .Where(r => r.UserId == userId)
+            .ToListAsync(ct);
+
+        var authoredItems = authoredPosts.Select(p => new
+        {
+            DisplayTimestamp = p.CreatedAt,
+            p.Id,
+            Dto = MapToFeedItem(p)
+        });
+
+        var repostItems = reposts.Select(r => new
+        {
+            DisplayTimestamp = r.CreatedAt,
+            Id = r.PostId,
+            Dto = MapToRepostFeedItem(r)
+        });
+
+        var feed = authoredItems
+            .Concat(repostItems)
+            .OrderByDescending(x => x.DisplayTimestamp)
+            .ThenByDescending(x => x.Id)
+            .Select(x => x.Dto)
+            .ToList();
+
+        return new PostFeedResult(feed);
     }
 
     public async Task Delete(long postId, long userId, CancellationToken ct = default)
@@ -146,6 +176,50 @@ public class PostService : IPostService
         _logger.LogInformation("Post {PostId} deleted by user {UserId}", post.Id, userId);
     }
 
+    public async Task<RepostResult> Repost(long postId, long userId, CancellationToken ct = default)
+    {
+        var post = await _applicationContext.Posts
+            .SingleOrDefaultAsync(p => p.Id == postId, ct);
+
+        if (post is null)
+        {
+            _logger.LogWarning("Repost failed — post {PostId} not found", postId);
+            throw new PostNotFoundException($"Post with id {postId} was not found.");
+        }
+
+        var userExists = await _applicationContext.Users
+            .AnyAsync(u => u.Id == userId, ct);
+
+        if (!userExists)
+        {
+            _logger.LogWarning("Repost failed — user {UserId} not found", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        var alreadyReposted = await _applicationContext.Reposts
+            .AnyAsync(r => r.PostId == postId && r.UserId == userId, ct);
+
+        if (alreadyReposted)
+        {
+            _logger.LogWarning("Repost failed — user {UserId} has already reposted post {PostId}", userId, postId);
+            throw new AlreadyRepostedException($"User {userId} has already reposted post {postId}.");
+        }
+
+        var repost = new Repost
+        {
+            PostId = postId,
+            UserId = userId,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        _applicationContext.Reposts.Add(repost);
+        await _applicationContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Post {PostId} reposted by user {UserId}", postId, userId);
+
+        return new RepostResult(repost.PostId, repost.UserId, repost.CreatedAt);
+    }
+
     private static PostFeedItemDto MapToFeedItem(Post post) =>
         new(
             post.Id,
@@ -154,6 +228,21 @@ public class PostService : IPostService
             post.CreatedAt,
             post.UpdatedAt,
             new PostAuthorDto(post.User.Id, post.User.Email),
-            post.Reply is not null ? MapToFeedItem(post.Reply) : null
+            post.Reply is not null ? MapToFeedItem(post.Reply) : null,
+            false,
+            null
+        );
+
+    private static PostFeedItemDto MapToRepostFeedItem(Repost repost) =>
+        new(
+            repost.Post.Id,
+            repost.Post.Text,
+            repost.Post.ImageUrl,
+            repost.Post.CreatedAt,
+            repost.Post.UpdatedAt,
+            new PostAuthorDto(repost.Post.User.Id, repost.Post.User.Email),
+            repost.Post.Reply is not null ? MapToFeedItem(repost.Post.Reply) : null,
+            true,
+            new PostAuthorDto(repost.User.Id, repost.User.Email)
         );
 }

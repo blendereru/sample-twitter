@@ -10,12 +10,32 @@ public class ApplicationContext : DbContext
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<EmailConfirmationToken> EmailConfirmationTokens { get; set; } = null!;
     public DbSet<Post> Posts { get; set; } = null!;
+    public DbSet<Repost> Reposts { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(builder =>
         {
             builder.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<Repost>(builder =>
+        {
+            builder.HasKey(r => new { r.PostId, r.UserId });
+
+            builder.HasOne(r => r.Post)
+                .WithMany(p => p.Reposts)
+                .HasForeignKey(r => r.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(r => r.User)
+                .WithMany(u => u.Reposts)
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(r => new { r.UserId, r.CreatedAt });
+
+            builder.HasQueryFilter(r => !r.Post.IsDeleted);
         });
 
         modelBuilder.Entity<EmailConfirmationToken>(builder =>

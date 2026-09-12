@@ -13,4 +13,5 @@ public class Post
     public DateTimeOffset? UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+    public List<Repost> Reposts { get; set; } = new();
 }
