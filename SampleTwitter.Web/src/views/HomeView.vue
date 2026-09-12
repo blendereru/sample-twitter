@@ -15,6 +15,7 @@ interface TweetItem {
   avatar: string;
   content: string;
   timestamp: string;
+  updatedAt?: string;
   imageUrl?: string;
   likes: number;
   retweets: number;
@@ -77,11 +78,12 @@ function handleNewTweet(post: { id: number; text?: string; imageUrl?: string }) 
   });
 }
 
-function handleTweetUpdated(post: { id: number; text?: string; imageUrl?: string }) {
+function handleTweetUpdated(post: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
   const tweet = tweets.value.find(t => t.id === post.id);
   if (tweet) {
     tweet.content = post.text || '';
     tweet.imageUrl = post.imageUrl;
+    tweet.updatedAt = post.updatedAt;
   }
 }
 
@@ -133,6 +135,7 @@ function handleDeleteTweet(id: number) {
         :content="tweet.content"
         :image-url="tweet.imageUrl"
         :timestamp="tweet.timestamp"
+        :updated-at="tweet.updatedAt"
         :likes="tweet.likes"
         :retweets="tweet.retweets"
         :replies="tweet.replies"

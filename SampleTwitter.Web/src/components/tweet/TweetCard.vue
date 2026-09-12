@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, MoreHorizontal, Trash2, UserX, VolumeX, Flag } from 'lucide-vue-next';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { editPost, deletePost } from '@/api/posts';
 import { parseApiError } from '@/api/client';
@@ -14,6 +14,7 @@ const props = defineProps<{
   avatar: string;
   content: string;
   timestamp: string;
+  updatedAt?: string;
   imageUrl?: string;
   likes?: number;
   retweets?: number;
@@ -21,7 +22,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'updated', post: { id: number; text?: string; imageUrl?: string }): void;
+  (e: 'updated', post: { id: number; text?: string; imageUrl?: string; updatedAt?: string }): void;
   (e: 'delete', id: number): void;
 }>();
 
@@ -148,6 +149,60 @@ function cancelEditing() {
   error.value = null;
 }
 
+const currentUpdatedAt = ref<string | undefined>(props.updatedAt);
+watch(
+  () => props.updatedAt,
+  (newVal) => {
+    currentUpdatedAt.value = newVal;
+  }
+);
+
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatFullDateTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+const formattedUpdatedAt = computed(() => {
+  if (!currentUpdatedAt.value) return null;
+  return formatTime(currentUpdatedAt.value);
+});
+
+const fullUpdatedAtTooltip = computed(() => {
+  if (!currentUpdatedAt.value) return '';
+  return `Last edited: ${formatFullDateTime(currentUpdatedAt.value)}`;
+});
+
 async function handleSave() {
   if (!isValid.value || loading.value) return;
 
@@ -158,15 +213,18 @@ async function handleSave() {
     const text = editText.value.trim() || undefined;
     const img = editImageUrl.value.trim() || undefined;
 
-    await editPost(props.id, {
+    const result = await editPost(props.id, {
       text,
       imageUrl: img,
     });
+
+    currentUpdatedAt.value = result.updatedAt;
 
     emit('updated', {
       id: props.id,
       text,
       imageUrl: img,
+      updatedAt: result.updatedAt,
     });
 
     isEditing.value = false;
@@ -191,11 +249,20 @@ async function handleSave() {
 
     <div class="flex flex-col gap-1.5 w-full">
       <div class="flex items-center justify-between text-sm">
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 flex-wrap">
           <span class="font-bold text-white hover:underline">{{ author }}</span>
           <span class="text-neutral-500">{{ handle }}</span>
           <span class="text-neutral-600">·</span>
           <span class="text-neutral-500 hover:underline">{{ timestamp }}</span>
+          <span
+            v-if="currentUpdatedAt && formattedUpdatedAt"
+            class="text-xs text-neutral-400 hover:text-neutral-300 flex items-center gap-1 cursor-default transition-colors"
+            :title="fullUpdatedAtTooltip"
+          >
+            <span class="text-neutral-600">·</span>
+            <Pencil class="w-3 h-3 text-neutral-400 inline shrink-0" />
+            <span>Edited {{ formattedUpdatedAt }}</span>
+          </span>
         </div>
 
         <div v-if="!isEditing" class="relative" ref="menuRef">

@@ -121,12 +121,12 @@ async function fetchFeed() {
   }
 }
 
-function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string }) {
+function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
   const item = posts.value.find(p => p.id === updated.id);
   if (item) {
     item.text = updated.text;
     item.imageUrl = updated.imageUrl;
-    item.updatedAt = new Date().toISOString();
+    item.updatedAt = updated.updatedAt || new Date().toISOString();
   }
 }
 
@@ -386,6 +386,7 @@ watch(
                 :content="post.parentPost.text || ''"
                 :image-url="post.parentPost.imageUrl"
                 :timestamp="formatDate(post.parentPost.createdAt)"
+                :updated-at="post.parentPost.updatedAt"
                 :can-edit="false"
                 class="!border-b-0 pb-2"
               />
@@ -409,6 +410,7 @@ watch(
             :content="post.text || ''"
             :image-url="post.imageUrl"
             :timestamp="formatDate(post.createdAt)"
+            :updated-at="post.updatedAt"
             :can-edit="isMyProfile || (authStore.currentUserId !== null && Number(authStore.currentUserId) === post.author.id)"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
