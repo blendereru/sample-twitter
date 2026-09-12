@@ -101,7 +101,7 @@ RFC 9457 ("Problem Details for HTTP APIs") defines a standard JSON shape for err
   "title":     "Invalid token",
   "status":    400,
   "detail":    "This confirmation link is invalid or has expired.",
-  "instance":  "POST /api/account/confirm-email",
+  "instance":  "POST /api/auth/confirm-email",
   "requestId": "0HN7...",
   "traceId":   "00-4bf9..."
 }
@@ -241,7 +241,7 @@ a remote server. The session cannot be hijacked purely through XSS.
 
 **The trade-off:** The Vue.js client cannot inspect the cookie at all. It cannot determine
 whether the user is logged in by checking `document.cookie`. Instead, the Vue app must infer
-authentication state by calling a dedicated API endpoint (e.g., `GET /api/account/me`) and
+authentication state by calling a dedicated API endpoint (e.g., `GET /api/auth/me`) and
 checking whether the response is `200 OK` or `401 Unauthorized`. This is the correct pattern and
 is not a practical limitation.
 

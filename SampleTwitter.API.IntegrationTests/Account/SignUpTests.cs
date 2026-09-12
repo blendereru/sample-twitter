@@ -33,7 +33,7 @@ public class SignUpTests : IntegrationTestBase
         // Arrange - requestBody provided by MemberData
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", requestBody);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", requestBody);
 
         // Assert
         await response.AssertValidationProblemDetails(expectedInvalidField);
@@ -48,7 +48,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "confirmed@example.com", Password = "AttemptedPassword1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert — HTTP contract
         var problemDetails = await response.AssertProblemDetails(HttpStatusCode.Conflict);
@@ -75,7 +75,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "pending@example.com", Password = "NewPassword1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert — HTTP contract
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -102,7 +102,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "new@example.com", Password = "Sup3rSecret1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert — HTTP contract
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -130,7 +130,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "  New@Example.com  ", Password = "Sup3rSecret1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert — request succeeded
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -152,7 +152,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "taken@example.com", Password = "NewP@ss1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.Conflict);
@@ -165,7 +165,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "nocookie@example.com", Password = "Sup3rSecret1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -181,7 +181,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "boundary@example.com", Password = "12345678" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -196,7 +196,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "tokencheck@example.com", Password = "Sup3rSecret1!" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -221,7 +221,7 @@ public class SignUpTests : IntegrationTestBase
         var request = new SignUpRequest { Email = "invaliduser@example.com", Password = "sh" };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/account/signup", request);
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

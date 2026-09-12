@@ -33,7 +33,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
+            $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
         // Assert — HTTP contract
@@ -66,7 +66,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token=completely-wrong-token",
+            $"/api/auth/confirm-email?userId={userId}&token=completely-wrong-token",
             content: null);
 
         // Assert
@@ -81,7 +81,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId + 999}&token={Uri.EscapeDataString(rawToken)}",
+            $"/api/auth/confirm-email?userId={userId + 999}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
         // Assert
@@ -96,7 +96,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
+            $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
         // Assert
@@ -111,7 +111,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
+            $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
         // Assert
@@ -123,7 +123,7 @@ public class ConfirmEmailTests : IntegrationTestBase
     {
         // Arrange
         var (userId, rawToken) = await SeedUserWithValidToken("user@example.com");
-        var url = $"/api/account/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}";
+        var url = $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}";
 
         // Act — first call
         var firstResponse = await _rawClient.PostAsync(url, content: null);
@@ -147,7 +147,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userAId}&token={Uri.EscapeDataString(rawTokenB)}",
+            $"/api/auth/confirm-email?userId={userAId}&token={Uri.EscapeDataString(rawTokenB)}",
             content: null);
 
         // Assert
@@ -173,7 +173,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token=invalid-token",
+            $"/api/auth/confirm-email?userId={userId}&token=invalid-token",
             content: null);
 
         // Assert
@@ -200,7 +200,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var confirmResponse = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
+            $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
         // Assert
@@ -209,7 +209,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var authCookie = cookieValues.First(v => v.StartsWith("SampleTwitter.Auth=")).Split(';')[0];
 
         // Act
-        var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/account/me")
+        var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
         {
             Headers = { { "Cookie", authCookie } }
         };
@@ -231,7 +231,7 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         // Act
         var response = await _rawClient.PostAsync(
-            $"/api/account/confirm-email?userId={userId}&token=",
+            $"/api/auth/confirm-email?userId={userId}&token=",
             content: null);
 
         // Assert
@@ -242,14 +242,14 @@ public class ConfirmEmailTests : IntegrationTestBase
     public async Task SupersededToken_AfterResend_Returns400AndNewTokenReturns200()
     {
         // Arrange
-        await Client.PostAsJsonAsync("/api/account/signup",
+        await Client.PostAsJsonAsync("/api/auth/signup",
             new SignUpRequest { Email = "resend@example.com", Password = "Sup3rSecret1!" });
 
         var firstEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
         var firstConfirmUrl = ExtractConfirmationUrl(firstEmail.HtmlBody);
         Factory.FakeEmailSender.Clear();
 
-        await Client.PostAsJsonAsync("/api/account/signup",
+        await Client.PostAsJsonAsync("/api/auth/signup",
             new SignUpRequest { Email = "resend@example.com", Password = "Sup3rSecret1!" });
 
         var secondEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
@@ -389,6 +389,6 @@ public class ConfirmEmailTests : IntegrationTestBase
         var fullUrl = htmlBody[hrefStart..hrefEnd];
 
         var uri = new Uri(fullUrl.Replace("&amp;", "&"));
-        return $"/api/account/confirm-email{uri.Query}";
+        return $"/api/auth/confirm-email{uri.Query}";
     }
 }

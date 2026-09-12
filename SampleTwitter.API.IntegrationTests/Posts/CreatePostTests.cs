@@ -449,7 +449,7 @@ public class CreatePostTests : IntegrationTestBase
     {
         var user = await SeedUser(email, password);
 
-        var loginResponse = await Client.PostAsJsonAsync("/api/account/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = email, Password = password });
 
         loginResponse.EnsureSuccessStatusCode();

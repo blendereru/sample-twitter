@@ -296,7 +296,7 @@ public class DeletePostTests : IntegrationTestBase
     {
         var user = await SeedUser(email, password);
 
-        var loginResponse = await Client.PostAsJsonAsync("/api/account/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = email, Password = password });
 
         loginResponse.EnsureSuccessStatusCode();
@@ -341,7 +341,7 @@ public class DeletePostTests : IntegrationTestBase
 
     private async Task<long> GetUserId(string cookie)
     {
-        var message = new HttpRequestMessage(HttpMethod.Get, "/api/account/me")
+        var message = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
         {
             Headers = { { "Cookie", cookie } }
         };

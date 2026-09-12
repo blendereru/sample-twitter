@@ -9,21 +9,21 @@ using SampleTwitter.API.DTOs.ResponseDTOs;
 
 namespace SampleTwitter.API.Controllers;
 [Tags("Account")]
-[Route("api/account")]
+[Route("api/auth")]
 [ApiController]
 public class AccountController : ControllerBase
 {
     private readonly IAccountService _accountService;
     private readonly IEmailConfirmationService _emailConfirmationService;
     private readonly ILogger<AccountController> _logger;
-    public AccountController(IAccountService accountService, IEmailConfirmationService emailConfirmationService, 
+    public AccountController(IAccountService accountService, IEmailConfirmationService emailConfirmationService,
         ILogger<AccountController> logger)
     {
         _accountService = accountService;
         _emailConfirmationService = emailConfirmationService;
         _logger = logger;
     }
-    
+
     /// <summary>
     /// Registers a new user account and sends a confirmation email.
     /// </summary>
@@ -39,9 +39,9 @@ public class AccountController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> SignUp(SignUpRequest request)
+    public async Task<IActionResult> SignUp(SignUpRequest request, CancellationToken ct)
     {
-        var result = await _accountService.Register(request);
+        var result = await _accountService.Register(request, ct);
 
         var payload = new SignUpResponse(
             result.UserId,
@@ -65,13 +65,13 @@ public class AccountController : ControllerBase
     public async Task<IActionResult> ConfirmEmail([FromQuery] long userId, [FromQuery] string token, CancellationToken ct)
     {
         var result = await _emailConfirmationService.ConfirmEmail(userId, token, ct);
-        
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, result.UserId.ToString()),
             new(ClaimTypes.Email, result.Email)
         };
-        
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
@@ -80,10 +80,10 @@ public class AccountController : ControllerBase
             principal,
             new AuthenticationProperties
             {
-                IsPersistent = true, 
+                IsPersistent = true,
                 IssuedUtc = DateTimeOffset.UtcNow
             });
-        
+
         _logger.LogInformation("User {UserId} confirmed email and signed in", result.UserId);
         return Ok(new ConfirmEmailResponse("Your email has been confirmed. You are now signed in."));
     }
@@ -102,9 +102,9 @@ public class AccountController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Login(LoginRequest request)
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
-        var result = await _accountService.Login(request);
+        var result = await _accountService.Login(request, ct);
 
         var claims = new List<Claim>
         {
@@ -128,7 +128,7 @@ public class AccountController : ControllerBase
 
         return Ok(new LoginResponse(result.UserId, result.Email, "Login successful."));
     }
-    
+
     /// <summary>
     /// Returns the profile information of the currently authenticated user.
     /// </summary>
@@ -151,7 +151,7 @@ public class AccountController : ControllerBase
 
         return Ok(new MeResponse(result.Id, result.Email, result.RegisteredAt));
     }
-    
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUser(long id)
     {

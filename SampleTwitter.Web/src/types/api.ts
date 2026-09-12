@@ -46,8 +46,10 @@ export interface EditPostRequest {
 }
 
 export interface EditPostResponse {
-  postId: number;
-  message: string;
+  id: number;
+  text?: string;
+  imageUrl?: string;
+  updatedAt?: string;
 }
 
 export interface PostAuthorDto {

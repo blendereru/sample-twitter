@@ -30,8 +30,10 @@ public class EditPostTests : IntegrationTestBase
 
         var body = await response.Content.ReadFromJsonAsync<EditPostResponse>();
         Assert.NotNull(body);
-        Assert.Equal(post.Id, body.PostId);
-        Assert.False(string.IsNullOrWhiteSpace(body.Message));
+        Assert.Equal(post.Id, body.Id);
+        Assert.Equal("updated text", body.Text);
+        Assert.Null(body.ImageUrl);
+        Assert.NotNull(body.UpdatedAt);
     }
 
     [Fact]
@@ -383,7 +385,7 @@ public class EditPostTests : IntegrationTestBase
     {
         var user = await SeedUser(email, password);
 
-        var loginResponse = await Client.PostAsJsonAsync("/api/account/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = email, Password = password });
 
         loginResponse.EnsureSuccessStatusCode();
@@ -429,7 +431,7 @@ public class EditPostTests : IntegrationTestBase
 
     private async Task<long> GetUserId(string cookie)
     {
-        var message = new HttpRequestMessage(HttpMethod.Get, "/api/account/me")
+        var message = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
         {
             Headers = { { "Cookie", cookie } }
         };

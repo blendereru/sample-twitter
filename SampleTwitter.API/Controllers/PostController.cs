@@ -57,7 +57,7 @@ public class PostController : ControllerBase
     /// <param name="id">The ID of the post to edit.</param>
     /// <param name="request">The new text and/or image URL for the post.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <response code="200">The post was updated successfully.</response>
+    /// <response code="200">The post was updated successfully; returns the modified post representation.</response>
     /// <response code="400">The request body failed validation (e.g. text exceeds 280 characters, empty post, or invalid image URL).</response>
     /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
     /// <response code="403">The authenticated user is not the author of this post.</response>
@@ -79,7 +79,7 @@ public class PostController : ControllerBase
 
         var result = await _postService.Edit(id, request, userId, ct);
 
-        return Ok(new EditPostResponse(result.Id, "Post updated successfully."));
+        return Ok(new EditPostResponse(result.Id, result.Text, result.ImageUrl, result.UpdatedAt));
     }
 
     /// <summary>

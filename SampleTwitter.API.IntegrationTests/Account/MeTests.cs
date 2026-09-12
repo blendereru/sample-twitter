@@ -22,10 +22,10 @@ public class MeTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", password);
 
         // Act
-        await Client.PostAsJsonAsync("/api/account/signin",
+        await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = password });
 
-        var response = await Client.GetAsync("/api/account/me");
+        var response = await Client.GetAsync("/api/auth/me");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -44,7 +44,7 @@ public class MeTests : IntegrationTestBase
         // Arrange - no authentication cookie provided
 
         // Act
-        var response = await Client.GetAsync("/api/account/me");
+        var response = await Client.GetAsync("/api/auth/me");
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -54,7 +54,7 @@ public class MeTests : IntegrationTestBase
     public async Task InvalidCookie_Returns401()
     {
         // Arrange
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/account/me")
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
         {
             Headers = { { "Cookie", "SampleTwitter.Auth=invalid_or_tampered_cookie_payload" } }
         };
@@ -74,11 +74,11 @@ public class MeTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", password);
 
         // Act
-        var loginResponse = await Client.PostAsJsonAsync("/api/account/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = password });
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
 
-        var meResponse = await Client.GetAsync("/api/account/me");
+        var meResponse = await Client.GetAsync("/api/auth/me");
         var meBody = await meResponse.Content.ReadFromJsonAsync<MeResponse>();
 
         // Assert
@@ -92,7 +92,7 @@ public class MeTests : IntegrationTestBase
     public async Task AfterConfirmEmail_MeReturnsTheConfirmedUser()
     {
         // Arrange
-        await Client.PostAsJsonAsync("/api/account/signup",
+        await Client.PostAsJsonAsync("/api/auth/signup",
             new SignUpRequest { Email = "confirm-me@example.com", Password = "Sup3rSecret1!" });
 
         var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
@@ -102,7 +102,7 @@ public class MeTests : IntegrationTestBase
         var confirmResponse = await Client.PostAsync(confirmUrl, content: null);
         Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
 
-        var meResponse = await Client.GetAsync("/api/account/me");
+        var meResponse = await Client.GetAsync("/api/auth/me");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
@@ -119,11 +119,11 @@ public class MeTests : IntegrationTestBase
         var password = "Sup3rSecret1!";
         await SeedConfirmedUser("user@example.com", password);
 
-        await Client.PostAsJsonAsync("/api/account/signin",
+        await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = password });
 
         // Act
-        var response = await Client.GetAsync("/api/account/me");
+        var response = await Client.GetAsync("/api/auth/me");
         var rawJson = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -138,11 +138,11 @@ public class MeTests : IntegrationTestBase
         await SeedConfirmedUser("alice@example.com", "Sup3rSecret1!");
         await SeedConfirmedUser("bob@example.com", "Sup3rSecret1!");
 
-        await Client.PostAsJsonAsync("/api/account/signin",
+        await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "bob@example.com", Password = "Sup3rSecret1!" });
 
         // Act
-        var response = await Client.GetAsync("/api/account/me");
+        var response = await Client.GetAsync("/api/auth/me");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -160,7 +160,7 @@ public class MeTests : IntegrationTestBase
         var email = "deleted-user@example.com";
         await SeedConfirmedUser(email, password);
 
-        await Client.PostAsJsonAsync("/api/account/signin",
+        await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = email, Password = password });
 
         using (var scope = Factory.Services.CreateScope())
@@ -172,7 +172,7 @@ public class MeTests : IntegrationTestBase
         }
 
         // Act
-        var response = await Client.GetAsync("/api/account/me");
+        var response = await Client.GetAsync("/api/auth/me");
 
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.NotFound);
@@ -201,6 +201,6 @@ public class MeTests : IntegrationTestBase
         var fullUrl = htmlBody[hrefStart..hrefEnd];
 
         var uri = new Uri(fullUrl.Replace("&amp;", "&"));
-        return $"/api/account/confirm-email{uri.Query}";
+        return $"/api/auth/confirm-email{uri.Query}";
     }
 }
