@@ -51,7 +51,7 @@ public class AccountService : IAccountService
             existingUser.RegisteredAt = DateTimeOffset.UtcNow;
             existingUser.PasswordHash = _passwordHasher.Hash(request.Password);
             await _applicationContext.SaveChangesAsync(ct);
-            await _emailConfirmationService.SendConfirmationEmail(existingUser, ct);
+            await _emailConfirmationService.SendConfirmationEmail(existingUser.Id, existingUser.Email, ct);
 
             return new RegisterResult(existingUser.Id, existingUser.Email, IsNewRegistration: false);
         }
@@ -78,7 +78,7 @@ public class AccountService : IAccountService
 
         _logger.LogInformation("New user registered with id {UserId}", user.Id);
 
-        await _emailConfirmationService.SendConfirmationEmail(user, ct);
+        await _emailConfirmationService.SendConfirmationEmail(user.Id, user.Email, ct);
 
         return new RegisterResult(user.Id, user.Email, IsNewRegistration: true);
     }
@@ -117,7 +117,7 @@ public class AccountService : IAccountService
         return new LoginResult(user.Id, user.Email);
     }
 
-    public async Task<User> GetUserById(long userId, CancellationToken ct = default)
+    public async Task<UserResult> GetUserById(long userId, CancellationToken ct = default)
     {
         var user = await _applicationContext.Users
             .SingleOrDefaultAsync(u => u.Id == userId, ct);
@@ -128,7 +128,7 @@ public class AccountService : IAccountService
             throw new UserNotFoundException($"User with id {userId} was not found.");
         }
 
-        return user;
+        return new UserResult(user.Id, user.Email, user.RegisteredAt);
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)

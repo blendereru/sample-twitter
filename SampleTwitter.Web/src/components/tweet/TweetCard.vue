@@ -2,7 +2,7 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, MoreHorizontal, Trash2, UserX, VolumeX, Flag } from 'lucide-vue-next';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { editPost } from '@/api/posts';
+import { editPost, deletePost } from '@/api/posts';
 import { parseApiError } from '@/api/client';
 
 const props = defineProps<{
@@ -39,6 +39,10 @@ const editImageUrl = ref('');
 const showImageInput = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
+
+const showDeleteModal = ref(false);
+const isDeleting = ref(false);
+const deleteError = ref<string | null>(null);
 
 const isAuthor = computed(() => {
   if (props.canEdit !== undefined) return props.canEdit;
@@ -79,7 +83,34 @@ function handleEditClick() {
 
 function handleDeleteClick() {
   menuOpen.value = false;
-  emit('delete', props.id);
+  deleteError.value = null;
+  showDeleteModal.value = true;
+}
+
+async function confirmDelete() {
+  if (isDeleting.value) return;
+
+  isDeleting.value = true;
+  deleteError.value = null;
+
+  try {
+    if (props.id > 0) {
+      await deletePost(props.id);
+    }
+    showDeleteModal.value = false;
+    emit('delete', props.id);
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    deleteError.value = parsed.detail || parsed.message || 'Failed to delete post.';
+  } finally {
+    isDeleting.value = false;
+  }
+}
+
+function cancelDelete() {
+  if (isDeleting.value) return;
+  showDeleteModal.value = false;
+  deleteError.value = null;
 }
 
 function handleClickOutside(event: MouseEvent) {
@@ -88,12 +119,20 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && showDeleteModal.value) {
+    cancelDelete();
+  }
+}
+
 onMounted(() => {
   window.addEventListener('click', handleClickOutside);
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   window.removeEventListener('click', handleClickOutside);
+  window.removeEventListener('keydown', handleKeydown);
 });
 
 function startEditing() {
@@ -349,4 +388,48 @@ async function handleSave() {
       </template>
     </div>
   </article>
+
+  <!-- Delete Confirmation Modal -->
+  <Teleport to="body">
+    <div
+      v-if="showDeleteModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs transition-opacity"
+      @click="cancelDelete"
+    >
+      <div
+        class="bg-black border border-neutral-800 rounded-2xl max-w-xs w-full p-6 flex flex-col gap-3 shadow-2xl"
+        @click.stop
+      >
+        <h3 class="text-xl font-extrabold text-white leading-tight">Delete post?</h3>
+        <p class="text-sm text-neutral-500 leading-relaxed">
+          This can’t be undone and it will be removed from your profile, the timeline of any accounts that follow you, and from search results.
+        </p>
+
+        <div v-if="deleteError" class="text-xs text-red-400 bg-red-950/40 border border-red-800/80 rounded-lg p-2.5 mt-1">
+          {{ deleteError }}
+        </div>
+
+        <div class="flex flex-col gap-2.5 mt-2">
+          <button
+            type="button"
+            @click="confirmDelete"
+            :disabled="isDeleting"
+            class="w-full py-2.5 rounded-full font-bold text-sm bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Loader2 v-if="isDeleting" class="w-4 h-4 animate-spin" />
+            <span>{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
+          </button>
+
+          <button
+            type="button"
+            @click="cancelDelete"
+            :disabled="isDeleting"
+            class="w-full py-2.5 rounded-full font-bold text-sm border border-neutral-700 hover:bg-neutral-900 text-white transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>

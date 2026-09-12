@@ -5,6 +5,7 @@ using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
+using SampleTwitter.API.Results;
 
 namespace SampleTwitter.API.Services;
 
@@ -18,7 +19,7 @@ public class PostService : IPostService
         _logger = logger;
     }
 
-    public async Task<Post> Create(CreatePostRequest request, long userId, CancellationToken ct = default)
+    public async Task<CreatePostResult> Create(CreatePostRequest request, long userId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
         {
@@ -51,10 +52,16 @@ public class PostService : IPostService
 
         _logger.LogInformation("Post {PostId} created by user {UserId}", post.Id, userId);
 
-        return post;
+        return new CreatePostResult(
+            post.Id,
+            post.Text,
+            post.ImageUrl,
+            post.ReplyId,
+            post.UserId,
+            post.CreatedAt);
     }
 
-    public async Task<Post> Edit(long postId, EditPostRequest request, long userId, CancellationToken ct = default)
+    public async Task<EditPostResult> Edit(long postId, EditPostRequest request, long userId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
         {
@@ -84,10 +91,14 @@ public class PostService : IPostService
 
         _logger.LogInformation("Post {PostId} edited by user {UserId}", post.Id, userId);
 
-        return post;
+        return new EditPostResult(
+            post.Id,
+            post.Text,
+            post.ImageUrl,
+            post.UpdatedAt);
     }
 
-    public async Task<PostFeedResponse> GetProfileFeed(
+    public async Task<PostFeedResult> GetProfileFeed(
         long userId,
         CancellationToken ct = default)
     {
@@ -108,7 +119,7 @@ public class PostService : IPostService
             .ThenByDescending(p => p.Id)
             .ToListAsync(ct);
 
-        return new PostFeedResponse(items.Select(MapToFeedItem).ToList());
+        return new PostFeedResult(items.Select(MapToFeedItem).ToList());
     }
 
     public async Task Delete(long postId, long userId, CancellationToken ct = default)

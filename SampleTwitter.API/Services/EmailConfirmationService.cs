@@ -3,6 +3,7 @@ using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
+using SampleTwitter.API.Results;
 
 namespace SampleTwitter.API.Services;
 
@@ -14,7 +15,7 @@ public class EmailConfirmationService : IEmailConfirmationService
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailConfirmationService> _logger;
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(24);
-    
+
     public EmailConfirmationService(ApplicationContext applicationContext, ISecureTokenGenerator tokenGenerator,
         IEmailSender emailSender, IConfiguration configuration, ILogger<EmailConfirmationService> logger)
     {
@@ -24,18 +25,21 @@ public class EmailConfirmationService : IEmailConfirmationService
         _configuration = configuration;
         _logger = logger;
     }
-    
-    public async Task SendConfirmationEmail(User user, CancellationToken ct = default)
+
+    public Task SendConfirmationEmail(User user, CancellationToken ct = default)
+        => SendConfirmationEmail(user.Id, user.Email, ct);
+
+    public async Task SendConfirmationEmail(long userId, string email, CancellationToken ct = default)
     {
         var oldTokens = await _applicationContext.EmailConfirmationTokens
-            .Where(t => t.UserId == user.Id && t.UsedAt == null)
+            .Where(t => t.UserId == userId && t.UsedAt == null)
             .ToListAsync(ct);
 
         if (oldTokens.Count > 0)
         {
             _logger.LogInformation(
                 "Invalidating {Count} outstanding confirmation token(s) for user {UserId}",
-                oldTokens.Count, user.Id);
+                oldTokens.Count, userId);
         }
 
         _applicationContext.EmailConfirmationTokens.RemoveRange(oldTokens);
@@ -43,7 +47,7 @@ public class EmailConfirmationService : IEmailConfirmationService
         var rawToken = _tokenGenerator.Generate();
         var tokenEntity = new EmailConfirmationToken
         {
-            UserId = user.Id,
+            UserId = userId,
             TokenHash = _tokenGenerator.Hash(rawToken),
             ExpiresAt = DateTimeOffset.UtcNow.Add(TokenLifetime),
             CreatedAt = DateTimeOffset.UtcNow
@@ -54,7 +58,7 @@ public class EmailConfirmationService : IEmailConfirmationService
 
         var baseUrl = _configuration["AppSettings:BaseUrl"];
         var confirmationLink =
-            $"{baseUrl}/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(rawToken)}";
+            $"{baseUrl}/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}";
 
         var body = $"""
                     <p>Welcome! Please confirm your email address by clicking the link below:</p>
@@ -64,17 +68,17 @@ public class EmailConfirmationService : IEmailConfirmationService
 
         try
         {
-            await _emailSender.Send(user.Email, "Confirm your email address", body, ct);
-            _logger.LogInformation("Confirmation email sent for user {UserId}", user.Id);
+            await _emailSender.Send(email, "Confirm your email address", body, ct);
+            _logger.LogInformation("Confirmation email sent for user {UserId}", userId);
         }
         catch (EmailDeliveryException ex)
         {
-            _logger.LogError(ex, "Failed to deliver confirmation email for user {UserId}", user.Id);
+            _logger.LogError(ex, "Failed to deliver confirmation email for user {UserId}", userId);
             throw;
         }
     }
 
-    public async Task<User> ConfirmEmail(long userId, string token, CancellationToken ct = default)
+    public async Task<ConfirmEmailResult> ConfirmEmail(long userId, string token, CancellationToken ct = default)
     {
         var tokenHash = _tokenGenerator.Hash(token);
 
@@ -95,6 +99,6 @@ public class EmailConfirmationService : IEmailConfirmationService
 
         _logger.LogInformation("Email confirmed for user {UserId}", userId);
 
-        return tokenEntity.User;
+        return new ConfirmEmailResult(tokenEntity.User.Id, tokenEntity.User.Email);
     }
 }

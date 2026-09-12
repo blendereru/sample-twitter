@@ -33,7 +33,7 @@ public class EmailConfirmationServiceTests : IDisposable
             _configurationMock.Object,
             NullLogger<EmailConfirmationService>.Instance);
     }
-    
+
     [Fact]
     public async Task SendConfirmationEmail_DelegatesEmailDeliveryToTheUsersAddress()
     {
@@ -43,14 +43,14 @@ public class EmailConfirmationServiceTests : IDisposable
         _tokenGeneratorMock.Setup(g => g.Hash("raw-token")).Returns("hashed-token");
 
         // Act
-        await _sut.SendConfirmationEmail(user);
+        await _sut.SendConfirmationEmail(user.Id, user.Email);
 
         // Assert
         _emailSenderMock.Verify(
             s => s.Send("recipient@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
-    
+
     [Fact]
     public async Task SendConfirmationEmail_EmailBodyContainsRawTokenNotHash()
     {
@@ -65,14 +65,14 @@ public class EmailConfirmationServiceTests : IDisposable
             .Callback<string, string, string, CancellationToken>((_, _, body, _) => capturedBody = body);
 
         // Act
-        await _sut.SendConfirmationEmail(user);
+        await _sut.SendConfirmationEmail(user.Id, user.Email);
 
         // Assert
         Assert.NotNull(capturedBody);
         Assert.Contains("raw-token-abc", capturedBody);
         Assert.DoesNotContain("hashed-token-xyz", capturedBody);
     }
-    
+
     [Fact]
     public async Task SendConfirmationEmail_EmailBodyContainsUserId()
     {
@@ -87,13 +87,13 @@ public class EmailConfirmationServiceTests : IDisposable
             .Callback<string, string, string, CancellationToken>((_, _, body, _) => capturedBody = body);
 
         // Act
-        await _sut.SendConfirmationEmail(user);
+        await _sut.SendConfirmationEmail(user.Id, user.Email);
 
         // Assert
         Assert.NotNull(capturedBody);
         Assert.Contains("userId=42", capturedBody);
     }
-    
+
     [Fact]
     public async Task SendConfirmationEmail_DelegatesTokenHashingWithTheGeneratedRawToken()
     {
@@ -103,12 +103,12 @@ public class EmailConfirmationServiceTests : IDisposable
         _tokenGeneratorMock.Setup(g => g.Hash(It.IsAny<string>())).Returns("any-hash");
 
         // Act
-        await _sut.SendConfirmationEmail(user);
+        await _sut.SendConfirmationEmail(user.Id, user.Email);
 
         // Assert
         _tokenGeneratorMock.Verify(g => g.Hash("raw-token-abc"), Times.Once);
     }
-    
+
     [Fact]
     public async Task SendConfirmationEmail_WhenEmailSenderThrows_PropagatesTheException()
     {
@@ -122,9 +122,9 @@ public class EmailConfirmationServiceTests : IDisposable
             .ThrowsAsync(new EmailDeliveryException("SMTP down"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<EmailDeliveryException>(() => _sut.SendConfirmationEmail(user));
+        await Assert.ThrowsAsync<EmailDeliveryException>(() => _sut.SendConfirmationEmail(user.Id, user.Email));
     }
-    
+
     [Fact]
     public async Task ConfirmEmail_HashesTheIncomingTokenBeforeLookup()
     {
@@ -153,9 +153,9 @@ public class EmailConfirmationServiceTests : IDisposable
         // Assert
         _tokenGeneratorMock.Verify(g => g.Hash("incoming-raw-token"), Times.Once);
     }
-    
+
     [Fact]
-    public async Task ConfirmEmail_WhenSuccessful_ReturnsUserWithEmailConfirmedTrue()
+    public async Task ConfirmEmail_WhenSuccessful_ReturnsUserIdAndEmail()
     {
         // Arrange
         var user = new User
@@ -177,12 +177,11 @@ public class EmailConfirmationServiceTests : IDisposable
         await _applicationContext.SaveChangesAsync();
 
         // Act
-        var returnedUser = await _sut.ConfirmEmail(1, "raw-token");
+        var returnedUserResult = await _sut.ConfirmEmail(1, "raw-token");
 
         // Assert
-        Assert.True(returnedUser.EmailConfirmed);
-        Assert.Equal(1, returnedUser.Id);
-        Assert.Equal("user@example.com", returnedUser.Email);
+        Assert.Equal(1, returnedUserResult.UserId);
+        Assert.Equal("user@example.com", returnedUserResult.Email);
     }
 
     public void Dispose() => _applicationContext.Dispose();

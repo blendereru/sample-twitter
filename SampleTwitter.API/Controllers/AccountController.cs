@@ -64,12 +64,12 @@ public class AccountController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ConfirmEmail([FromQuery] long userId, [FromQuery] string token, CancellationToken ct)
     {
-        var user = await _emailConfirmationService.ConfirmEmail(userId, token, ct);
+        var result = await _emailConfirmationService.ConfirmEmail(userId, token, ct);
         
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Email, user.Email)
+            new(ClaimTypes.NameIdentifier, result.UserId.ToString()),
+            new(ClaimTypes.Email, result.Email)
         };
         
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -84,7 +84,7 @@ public class AccountController : ControllerBase
                 IssuedUtc = DateTimeOffset.UtcNow
             });
         
-        _logger.LogInformation("User {UserId} confirmed email and signed in", user.Id);
+        _logger.LogInformation("User {UserId} confirmed email and signed in", result.UserId);
         return Ok(new ConfirmEmailResponse("Your email has been confirmed. You are now signed in."));
     }
     /// <summary>
@@ -147,9 +147,9 @@ public class AccountController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var userId = long.Parse(userIdClaim!);
 
-        var user = await _accountService.GetUserById(userId, ct);
+        var result = await _accountService.GetUserById(userId, ct);
 
-        return Ok(new MeResponse(user.Id, user.Email, user.RegisteredAt));
+        return Ok(new MeResponse(result.Id, result.Email, result.RegisteredAt));
     }
     
     [HttpGet("{id}")]

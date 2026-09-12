@@ -43,7 +43,8 @@ public class AccountServiceTests : IDisposable
         // Assert
         _emailConfirmationServiceMock.Verify(
             s => s.SendConfirmationEmail(
-                It.Is<User>(u => u.Email == "test@example.com"),
+                It.IsAny<long>(),
+                It.Is<string>(email => email == "test@example.com"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -77,7 +78,7 @@ public class AccountServiceTests : IDisposable
             () => _sut.Register(new SignUpRequest { Email = "existing@example.com", Password = "P@ss1" }));
 
         _emailConfirmationServiceMock.Verify(
-            s => s.SendConfirmationEmail(It.IsAny<User>(), It.IsAny<CancellationToken>()),
+            s => s.SendConfirmationEmail(It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -218,6 +219,7 @@ public class AccountServiceTests : IDisposable
         // Assert
         Assert.Equal(seededUser.Id, result.Id);
         Assert.Equal("user@example.com", result.Email);
+        Assert.Equal(seededUser.RegisteredAt, result.RegisteredAt);
     }
 
     [Fact]

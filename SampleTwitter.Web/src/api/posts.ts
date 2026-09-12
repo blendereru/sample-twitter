@@ -10,3 +10,7 @@ export async function editPost(id: number, request: EditPostRequest): Promise<Ed
   const response = await apiClient.put<EditPostResponse>(`/posts/${id}`, request);
   return response.data;
 }
+
+export async function deletePost(id: number): Promise<void> {
+  await apiClient.delete(`/posts/${id}`);
+}

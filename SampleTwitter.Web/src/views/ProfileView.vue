@@ -132,6 +132,11 @@ function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: stri
 
 function handlePostDeleted(id: number) {
   posts.value = posts.value.filter(p => p.id !== id);
+  for (const post of posts.value) {
+    if (post.parentPost?.id === id) {
+      post.parentPost = undefined;
+    }
+  }
 }
 
 function goBack() {

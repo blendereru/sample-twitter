@@ -45,8 +45,8 @@ public class ApplicationContext : DbContext
             builder.HasIndex(p => p.ReplyId);
 
             builder.Property(p => p.Text).HasMaxLength(280);
-        });
 
-        modelBuilder.Entity<Post>().HasQueryFilter(p => !p.IsDeleted);
+            builder.HasQueryFilter(p => !p.IsDeleted);
+        });
     }
 }

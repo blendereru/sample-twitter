@@ -1,9 +1,9 @@
-using SampleTwitter.API.Models;
+using SampleTwitter.API.Results;
 
 namespace SampleTwitter.API.Abstractions;
 
 public interface IEmailConfirmationService
 {
-    Task SendConfirmationEmail(User user, CancellationToken ct = default);
-    Task<User> ConfirmEmail(long userId, string token, CancellationToken ct = default);
+    Task SendConfirmationEmail(long userId, string email, CancellationToken ct = default);
+    Task<ConfirmEmailResult> ConfirmEmail(long userId, string token, CancellationToken ct = default);
 }

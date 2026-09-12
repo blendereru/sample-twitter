@@ -33,6 +33,6 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetProfilePosts(long userId, CancellationToken ct)
     {
         var feed = await _postService.GetProfileFeed(userId, ct);
-        return Ok(feed);
+        return Ok(new PostFeedResponse(feed.Items));
     }
 }

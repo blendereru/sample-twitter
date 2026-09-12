@@ -43,11 +43,11 @@ public class PostController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var userId = long.Parse(userIdClaim!);
 
-        var post = await _postService.Create(request, userId, ct);
+        var result = await _postService.Create(request, userId, ct);
 
-        var response = new CreatePostResponse(post.Id, "Post created successfully.");
+        var response = new CreatePostResponse(result.Id, "Post created successfully.");
 
-        return CreatedAtAction(nameof(GetById), new { id = post.Id }, response);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, response);
     }
 
     /// <summary>
@@ -77,9 +77,9 @@ public class PostController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var userId = long.Parse(userIdClaim!);
 
-        var post = await _postService.Edit(id, request, userId, ct);
+        var result = await _postService.Edit(id, request, userId, ct);
 
-        return Ok(new EditPostResponse(post.Id, "Post updated successfully."));
+        return Ok(new EditPostResponse(result.Id, "Post updated successfully."));
     }
 
     /// <summary>
