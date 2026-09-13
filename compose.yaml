@@ -1,0 +1,57 @@
+services:
+  web:
+    build: ./SampleTwitter.Web
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+  api:
+    build: .
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=sampletwitter;Username=postgres;Password=${DB_PASSWORD}
+      - Serilog__WriteTo__1__Args__serverUrl=http://seq:5341
+      - Serilog__WriteTo__1__Args__apiKey=${SEQ_API_KEY}
+      - AppSettings__BaseUrl=${BASE_URL:-http://localhost:3000}
+      - EmailSettings__SmtpHost=${SMTP_HOST:-smtp.gmail.com}
+      - EmailSettings__SmtpPort=${SMTP_PORT:-587}
+      - EmailSettings__SmtpUsername=${SMTP_USERNAME}
+      - EmailSettings__SmtpPassword=${SMTP_PASSWORD}
+      - EmailSettings__FromAddress=${SMTP_FROM_ADDRESS}
+      - EmailSettings__FromName=${SMTP_FROM_NAME:-SampleTwitter}
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: sampletwitter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  seq:
+    image: datalust/seq:latest
+    ports:
+      - "5341:5341"
+      - "8081:80"
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_FIRSTRUN_ADMINPASSWORD}
+    volumes:
+      - seqdata:/data
+
+volumes:
+  pgdata:
+  seqdata:

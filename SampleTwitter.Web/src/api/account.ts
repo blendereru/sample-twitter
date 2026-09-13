@@ -29,4 +29,3 @@ export async function getMe(): Promise<MeResponse> {
   const response = await apiClient.get<MeResponse>('/auth/me');
   return response.data;
 }
-

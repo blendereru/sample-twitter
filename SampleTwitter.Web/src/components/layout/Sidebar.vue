@@ -102,4 +102,3 @@ function handleLogout() {
     </div>
   </header>
 </template>
-

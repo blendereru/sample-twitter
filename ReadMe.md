@@ -12,7 +12,7 @@ Not caring about front-end part, 100% `slopping`.
 * `Cookie-based auth` - reasonable to use with browser as a client.
 * `TestContainers` + `WebApplicationFactory` - imitate real world scenario during testing.
 * `OpenApi` + `Scalar` - UI is just so beautiful.
-* 'Architecture Tests' - set some rules in the source code. This ensures boundaries are not crossed, and that all methods/classes
+* `Architecture Tests` - set some rules in the source code. This ensures boundaries are not crossed, and that all methods/classes
 follow the same standard/approach.
 
 ## What is planned but not implemented yet?

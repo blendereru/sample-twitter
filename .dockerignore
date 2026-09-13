@@ -1,0 +1,28 @@
+**/.git
+**/.gitignore
+**/.idea
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/node_modules
+**/dist
+
+# Test projects — not needed in production image
+SampleTwitter.API.UnitTests/
+SampleTwitter.API.IntegrationTests/
+SampleTwitter.API.ArchitectureTests/
+SampleTwitter.Web/
+
+# Docs and misc
+docs/
+ReadMe.md
+LICENSE
+*.md
+*.sln.DotSettings.user
+
+# Docker files themselves
+Dockerfile
+compose.yaml
+.env
+.env.*

@@ -59,5 +59,3 @@ export const useAuthStore = defineStore('auth', () => {
     fetchCurrentUser,
   };
 });
-
-
