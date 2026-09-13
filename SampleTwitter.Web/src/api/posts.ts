@@ -19,3 +19,9 @@ export async function repostPost(id: number): Promise<RepostResponse> {
   const response = await apiClient.post<RepostResponse>(`/posts/${id}/repost`);
   return response.data;
 }
+
+export async function undoRepost(id: number): Promise<void> {
+  await apiClient.delete(`/posts/${id}/repost`);
+}
+
+export const undoRepostPost = undoRepost;

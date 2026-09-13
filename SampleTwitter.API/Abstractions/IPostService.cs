@@ -10,4 +10,5 @@ public interface IPostService
     Task<PostFeedResult> GetProfileFeed(long userId, CancellationToken ct = default);
     Task Delete(long postId, long userId, CancellationToken ct = default);
     Task<RepostResult> Repost(long postId, long userId, CancellationToken ct = default);
+    Task UndoRepost(long postId, long userId, CancellationToken ct = default);
 }

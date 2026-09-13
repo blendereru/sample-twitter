@@ -113,6 +113,7 @@ async function fetchFeed(options: { silent?: boolean } = {}) {
   try {
     const response = await getUserPosts(targetUserId.value);
     posts.value = response.items || [];
+    updateRepostedPostIds(posts.value);
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     if (parsed.status === 404) {
@@ -126,6 +127,19 @@ async function fetchFeed(options: { silent?: boolean } = {}) {
       loading.value = false;
     }
   }
+}
+
+const myRepostedPostIds = ref<Set<number>>(new Set());
+
+function updateRepostedPostIds(items: PostFeedItemDto[]) {
+  const currentId = authStore.currentUserId;
+  const newSet = new Set<number>();
+  for (const p of items) {
+    if (p.isRepost && (isMyProfile.value || (currentId !== null && p.repostedBy?.id === Number(currentId)))) {
+      newSet.add(p.id);
+    }
+  }
+  myRepostedPostIds.value = newSet;
 }
 
 function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
@@ -147,6 +161,8 @@ function handlePostDeleted(id: number) {
 }
 
 async function handlePostReposted(response: RepostResponse) {
+  myRepostedPostIds.value.add(response.postId);
+
   // Optimistically increment repost count across any instances of this post in the feed
   for (const p of posts.value) {
     if (p.id === response.postId) {
@@ -159,6 +175,27 @@ async function handlePostReposted(response: RepostResponse) {
 
   if (isMyProfile.value) {
     // Silently re-sync the feed so the repost surfaces at the top without unmounting/flashing
+    await fetchFeed({ silent: true });
+  }
+}
+
+async function handlePostUndoReposted(postId: number) {
+  myRepostedPostIds.value.delete(postId);
+
+  // Optimistically decrement repost count across any instances of this post in the feed
+  for (const p of posts.value) {
+    if (p.id === postId) {
+      p.repostCount = Math.max(0, (p.repostCount || 0) - 1);
+    }
+    if (p.parentPost?.id === postId) {
+      p.parentPost.repostCount = Math.max(0, (p.parentPost.repostCount || 0) - 1);
+    }
+  }
+
+  if (isMyProfile.value) {
+    // Remove the repost entry from profile feed immediately
+    posts.value = posts.value.filter(p => !(p.isRepost && p.id === postId));
+    // Silently re-sync the feed in background
     await fetchFeed({ silent: true });
   }
 }
@@ -419,7 +456,9 @@ watch(
                 :updated-at="post.parentPost.updatedAt"
                 :retweets="post.parentPost.repostCount"
                 :can-edit="false"
+                :is-reposted="myRepostedPostIds.has(post.parentPost.id)"
                 @reposted="handlePostReposted"
+                @undo-repost="handlePostUndoReposted"
                 class="!border-b-0 pb-2"
               />
               <!-- Connector line -->
@@ -445,10 +484,11 @@ watch(
             :updated-at="post.updatedAt"
             :retweets="post.repostCount"
             :can-edit="!post.isRepost && (isMyProfile || (authStore.currentUserId !== null && Number(authStore.currentUserId) === post.author.id))"
-            :is-reposted="post.isRepost && isMyProfile"
+            :is-reposted="myRepostedPostIds.has(post.id) || (post.isRepost && isMyProfile)"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
             @reposted="handlePostReposted"
+            @undo-repost="handlePostUndoReposted"
             class="!border-b-0"
           />
         </div>

@@ -3,7 +3,7 @@ import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Ima
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { editPost, deletePost, repostPost } from '@/api/posts';
+import { editPost, deletePost, repostPost, undoRepost } from '@/api/posts';
 import { parseApiError } from '@/api/client';
 import type { RepostResponse } from '@/types/api';
 
@@ -28,6 +28,7 @@ const emit = defineEmits<{
   (e: 'updated', post: { id: number; text?: string; imageUrl?: string; updatedAt?: string }): void;
   (e: 'delete', id: number): void;
   (e: 'reposted', response: RepostResponse): void;
+  (e: 'undo-repost', id: number): void;
 }>();
 
 const router = useRouter();
@@ -35,6 +36,9 @@ const authStore = useAuthStore();
 
 const liked = ref(false);
 const likeCount = ref(props.likes || 0);
+
+const repostMenuOpen = ref(false);
+const repostMenuRef = ref<HTMLElement | null>(null);
 
 const isReposting = ref(false);
 const reposted = ref(props.isReposted ?? false);
@@ -55,11 +59,23 @@ watch(
   }
 );
 
-async function handleRepost() {
+function toggleRepostMenu() {
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+  repostMenuOpen.value = !repostMenuOpen.value;
+  if (repostMenuOpen.value) {
+    menuOpen.value = false;
+  }
+}
+
+async function executeRepost() {
+  repostMenuOpen.value = false;
   if (isReposting.value) return;
 
   if (!authStore.isAuthenticated) {
-    router.push('/signin');
+    router.push('/login');
     return;
   }
 
@@ -93,6 +109,55 @@ async function handleRepost() {
   } finally {
     isReposting.value = false;
   }
+}
+
+async function executeUndoRepost() {
+  repostMenuOpen.value = false;
+  if (isReposting.value) return;
+
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+
+  if (props.id <= 0) {
+    repostError.value = 'Cannot undo repost on demo tweets.';
+    setTimeout(() => {
+      repostError.value = null;
+    }, 3000);
+    return;
+  }
+
+  isReposting.value = true;
+  repostError.value = null;
+
+  try {
+    await undoRepost(props.id);
+    reposted.value = false;
+    repostCount.value = Math.max(0, repostCount.value - 1);
+    emit('undo-repost', props.id);
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    if (parsed.status === 404) {
+      reposted.value = false;
+      emit('undo-repost', props.id);
+    } else {
+      repostError.value = parsed.detail || parsed.message || 'Failed to undo repost.';
+    }
+    setTimeout(() => {
+      repostError.value = null;
+    }, 4000);
+  } finally {
+    isReposting.value = false;
+  }
+}
+
+function handleQuote() {
+  repostMenuOpen.value = false;
+  repostError.value = 'Quote tweets are coming soon!';
+  setTimeout(() => {
+    repostError.value = null;
+  }, 3000);
 }
 
 const menuOpen = ref(false);
@@ -139,6 +204,9 @@ function toggleLike() {
 
 function toggleMenu() {
   menuOpen.value = !menuOpen.value;
+  if (menuOpen.value) {
+    repostMenuOpen.value = false;
+  }
 }
 
 function handleEditClick() {
@@ -182,11 +250,22 @@ function handleClickOutside(event: MouseEvent) {
   if (menuOpen.value && menuRef.value && !menuRef.value.contains(event.target as Node)) {
     menuOpen.value = false;
   }
+  if (repostMenuOpen.value && repostMenuRef.value && !repostMenuRef.value.contains(event.target as Node)) {
+    repostMenuOpen.value = false;
+  }
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && showDeleteModal.value) {
-    cancelDelete();
+  if (event.key === 'Escape') {
+    if (repostMenuOpen.value) {
+      repostMenuOpen.value = false;
+    }
+    if (menuOpen.value) {
+      menuOpen.value = false;
+    }
+    if (showDeleteModal.value) {
+      cancelDelete();
+    }
   }
 }
 
@@ -487,22 +566,74 @@ async function handleSave() {
             <span>{{ replies || 0 }}</span>
           </button>
 
-          <button
-            type="button"
-            @click.stop="handleRepost"
-            :disabled="isReposting"
-            :class="[
-              'flex items-center gap-1.5 group transition-colors',
-              reposted ? 'text-emerald-500' : 'hover:text-emerald-400 text-neutral-500'
-            ]"
-            :title="reposted ? 'Already reposted' : 'Repost'"
-          >
-            <div :class="['p-2 rounded-full transition-colors', reposted ? 'bg-emerald-500/10 text-emerald-500' : 'group-hover:bg-emerald-500/10']">
-              <Loader2 v-if="isReposting" class="w-4 h-4 animate-spin text-emerald-500" />
-              <Repeat2 v-else class="w-4 h-4" />
+          <div class="relative" ref="repostMenuRef">
+            <button
+              type="button"
+              @click.stop="toggleRepostMenu"
+              :disabled="isReposting"
+              :class="[
+                'flex items-center gap-1.5 group transition-colors select-none',
+                reposted ? 'text-emerald-500' : 'hover:text-emerald-400 text-neutral-500'
+              ]"
+              :title="reposted ? 'Undo repost' : 'Repost'"
+            >
+              <div
+                :class="[
+                  'p-2 rounded-full transition-all group-active:scale-90',
+                  reposted ? 'bg-emerald-500/10 text-emerald-500' : 'group-hover:bg-emerald-500/10'
+                ]"
+              >
+                <Loader2 v-if="isReposting" class="w-4 h-4 animate-spin text-emerald-500" />
+                <Repeat2 v-else class="w-4 h-4" />
+              </div>
+              <span :class="reposted ? 'text-emerald-500 font-semibold' : ''">{{ repostCount }}</span>
+            </button>
+
+            <!-- Repost / Undo Repost Popover Menu -->
+            <div
+              v-if="repostMenuOpen"
+              class="absolute left-0 bottom-full mb-1.5 z-30 w-44 bg-black border border-neutral-800 rounded-2xl shadow-2xl py-1.5 overflow-hidden select-none"
+              @click.stop
+            >
+              <template v-if="!reposted">
+                <button
+                  type="button"
+                  @click="executeRepost"
+                  class="w-full px-4 py-2.5 text-left text-sm text-neutral-200 hover:bg-neutral-900 hover:text-white flex items-center gap-3 transition-colors font-bold group/item cursor-pointer"
+                >
+                  <Repeat2 class="w-4.5 h-4.5 text-neutral-400 group-hover/item:text-emerald-400 transition-colors" />
+                  <span>Repost</span>
+                </button>
+                <button
+                  type="button"
+                  @click="handleQuote"
+                  class="w-full px-4 py-2.5 text-left text-sm text-neutral-200 hover:bg-neutral-900 hover:text-white flex items-center gap-3 transition-colors font-bold group/item cursor-pointer"
+                >
+                  <Pencil class="w-4.5 h-4.5 text-neutral-400 group-hover/item:text-sky-400 transition-colors" />
+                  <span>Quote</span>
+                </button>
+              </template>
+
+              <template v-else>
+                <button
+                  type="button"
+                  @click="executeUndoRepost"
+                  class="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-3 transition-colors font-bold group/item cursor-pointer"
+                >
+                  <Repeat2 class="w-4.5 h-4.5 text-red-500 group-hover/item:text-red-400 transition-colors" />
+                  <span class="group-hover/item:text-red-400">Undo repost</span>
+                </button>
+                <button
+                  type="button"
+                  @click="handleQuote"
+                  class="w-full px-4 py-2.5 text-left text-sm text-neutral-200 hover:bg-neutral-900 hover:text-white flex items-center gap-3 transition-colors font-bold group/item cursor-pointer"
+                >
+                  <Pencil class="w-4.5 h-4.5 text-neutral-400 group-hover/item:text-sky-400 transition-colors" />
+                  <span>Quote</span>
+                </button>
+              </template>
             </div>
-            <span>{{ repostCount }}</span>
-          </button>
+          </div>
 
           <button
             @click.stop="toggleLike"

@@ -13,6 +13,7 @@ public class PostService : IPostService
 {
     private readonly ApplicationContext _applicationContext;
     private readonly ILogger<PostService> _logger;
+
     public PostService(ApplicationContext applicationContext, ILogger<PostService> logger)
     {
         _applicationContext = applicationContext;
@@ -234,6 +235,24 @@ public class PostService : IPostService
         _logger.LogInformation("Post {PostId} reposted by user {UserId}", postId, userId);
 
         return new RepostResult(repost.PostId, repost.UserId, repost.CreatedAt);
+    }
+
+    public async Task UndoRepost(long postId, long userId, CancellationToken ct = default)
+    {
+        var repost = await _applicationContext.Reposts
+            .SingleOrDefaultAsync(r => r.PostId == postId && r.UserId == userId, ct);
+
+        if(repost is null)
+        {
+            _logger.LogWarning(
+                "Undo repost failed - post {PostId} not found or user {UserId} hasn't reposted this post.", postId, userId);
+            throw new RepostNotFoundException($"Repost for post {postId} by user {userId} was not found.");
+        }
+
+        _applicationContext.Reposts.Remove(repost);
+        await _applicationContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Repost for post {PostId} by user {UserId} undone", postId, userId);
     }
 
     private static PostFeedItemDto MapToFeedItem(Post post, IReadOnlyDictionary<long, int> repostCounts) =>

@@ -139,6 +139,33 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
+    /// Removes (undoes) a repost of an existing post for the authenticated user.
+    /// </summary>
+    /// <param name="id">The ID of the post whose repost should be undone.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">The repost was removed successfully.</response>
+    /// <response code="400">The request is invalid (e.g. invalid post ID format).</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">The repost does not exist (post not found or user has not reposted this post).</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpDelete("{id}/repost")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UndoRepost(long id, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = long.Parse(userIdClaim!);
+
+        await _postService.UndoRepost(id, userId, ct);
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Retrieves a post by its ID.
     /// </summary>
     /// <response code="200">The post was found.</response>

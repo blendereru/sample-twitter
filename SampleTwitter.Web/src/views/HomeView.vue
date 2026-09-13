@@ -21,6 +21,7 @@ interface TweetItem {
   likes: number;
   retweets: number;
   replies: number;
+  isReposted?: boolean;
 }
 
 const tweets = ref<TweetItem[]>([
@@ -96,6 +97,15 @@ function handleTweetReposted(response: RepostResponse) {
   const tweet = tweets.value.find(t => t.id === response.postId);
   if (tweet) {
     tweet.retweets = (tweet.retweets || 0) + 1;
+    tweet.isReposted = true;
+  }
+}
+
+function handleTweetUndoReposted(postId: number) {
+  const tweet = tweets.value.find(t => t.id === postId);
+  if (tweet) {
+    tweet.retweets = Math.max(0, (tweet.retweets || 0) - 1);
+    tweet.isReposted = false;
   }
 }
 </script>
@@ -147,9 +157,11 @@ function handleTweetReposted(response: RepostResponse) {
         :likes="tweet.likes"
         :retweets="tweet.retweets"
         :replies="tweet.replies"
+        :is-reposted="tweet.isReposted"
         @updated="handleTweetUpdated"
         @delete="handleDeleteTweet"
         @reposted="handleTweetReposted"
+        @undo-repost="handleTweetUndoReposted"
       />
     </div>
   </main>

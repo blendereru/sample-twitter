@@ -205,21 +205,21 @@ public class AccountServiceTests : IDisposable
     public async Task GetUserById_ExistingUser_ReturnsUserWithCorrectFields()
     {
         // Arrange
-        _applicationContext.Users.Add(new User
+        var user = new User
         {
             Email = "user@example.com", PasswordHash = "hash",
             EmailConfirmed = true, RegisteredAt = DateTimeOffset.UtcNow
-        });
+        };
+        _applicationContext.Users.Add(user);
         await _applicationContext.SaveChangesAsync();
-        var seededUser = _applicationContext.Users.Single();
 
         // Act
-        var result = await _sut.GetUserById(seededUser.Id);
+        var result = await _sut.GetUserById(user.Id);
 
         // Assert
-        Assert.Equal(seededUser.Id, result.Id);
+        Assert.Equal(user.Id, result.Id);
         Assert.Equal("user@example.com", result.Email);
-        Assert.Equal(seededUser.RegisteredAt, result.RegisteredAt);
+        Assert.Equal(user.RegisteredAt, result.RegisteredAt);
     }
 
     [Fact]
