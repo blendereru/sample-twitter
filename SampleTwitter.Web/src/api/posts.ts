@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { CreatePostRequest, CreatePostResponse, EditPostRequest, EditPostResponse } from '@/types/api';
+import type { CreatePostRequest, CreatePostResponse, EditPostRequest, EditPostResponse, RepostResponse } from '@/types/api';
 
 export async function createPost(request: CreatePostRequest): Promise<CreatePostResponse> {
   const response = await apiClient.post<CreatePostResponse>('/posts', request);
@@ -13,4 +13,9 @@ export async function editPost(id: number, request: EditPostRequest): Promise<Ed
 
 export async function deletePost(id: number): Promise<void> {
   await apiClient.delete(`/posts/${id}`);
+}
+
+export async function repostPost(id: number): Promise<RepostResponse> {
+  const response = await apiClient.post<RepostResponse>(`/posts/${id}/repost`);
+  return response.data;
 }

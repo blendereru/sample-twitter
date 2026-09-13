@@ -12,6 +12,7 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="ParentPost">Parent post context if this post is a continuation of a self-thread.</param>
 /// <param name="IsRepost">Indicates whether this item appears in the feed as a repost.</param>
 /// <param name="RepostedBy">The user who reposted this post, if this item is a repost.</param>
+/// <param name="RepostCount">The total number of reposts this post has received.</param>
 public record PostFeedItemDto(
     long Id,
     string? Text,
@@ -21,5 +22,6 @@ public record PostFeedItemDto(
     PostAuthorDto Author,
     PostFeedItemDto? ParentPost,
     bool IsRepost,
-    PostAuthorDto? RepostedBy
+    PostAuthorDto? RepostedBy,
+    int RepostCount
 );

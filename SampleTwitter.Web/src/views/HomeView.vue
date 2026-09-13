@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import TweetComposer from '@/components/tweet/TweetComposer.vue';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import { useAuthStore } from '@/stores/auth';
+import type { RepostResponse } from '@/types/api';
 
 const authStore = useAuthStore();
 const activeTab = ref<'forYou' | 'following'>('forYou');
@@ -90,6 +91,13 @@ function handleTweetUpdated(post: { id: number; text?: string; imageUrl?: string
 function handleDeleteTweet(id: number) {
   tweets.value = tweets.value.filter(t => t.id !== id);
 }
+
+function handleTweetReposted(response: RepostResponse) {
+  const tweet = tweets.value.find(t => t.id === response.postId);
+  if (tweet) {
+    tweet.retweets = (tweet.retweets || 0) + 1;
+  }
+}
 </script>
 
 <template>
@@ -141,6 +149,7 @@ function handleDeleteTweet(id: number) {
         :replies="tweet.replies"
         @updated="handleTweetUpdated"
         @delete="handleDeleteTweet"
+        @reposted="handleTweetReposted"
       />
     </div>
   </main>

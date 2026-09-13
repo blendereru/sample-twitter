@@ -359,6 +359,7 @@ public class PostServiceTests : IDisposable
         Assert.Null(item.ParentPost);
         Assert.False(item.IsRepost);
         Assert.Null(item.RepostedBy);
+        Assert.Equal(0, item.RepostCount);
     }
 
     [Fact]
@@ -511,7 +512,7 @@ public class PostServiceTests : IDisposable
 
         var post1 = await SeedPost(userId: 1, text: "user 1 original post", createdAt: t1);
         var post2 = await SeedPost(userId: 2, text: "user 2 original post", createdAt: t2);
-        var repost = await SeedRepost(postId: post2.Id, userId: 1, createdAt: t3);
+        await SeedRepost(postId: post2.Id, userId: 1, createdAt: t3);
 
         // Act
         var result = await _sut.GetProfileFeed(userId: 1);
@@ -528,6 +529,7 @@ public class PostServiceTests : IDisposable
         Assert.True(first.IsRepost);
         Assert.NotNull(first.RepostedBy);
         Assert.Equal(1, first.RepostedBy!.Id);
+        Assert.Equal(1, first.RepostCount);
 
         var second = result.Items[1];
         Assert.Equal(post1.Id, second.Id);
@@ -536,6 +538,7 @@ public class PostServiceTests : IDisposable
         Assert.Equal(1, second.Author.Id);
         Assert.False(second.IsRepost);
         Assert.Null(second.RepostedBy);
+        Assert.Equal(0, second.RepostCount);
     }
 
     [Fact]
@@ -562,17 +565,20 @@ public class PostServiceTests : IDisposable
         Assert.Equal(post1.Id, result.Items[0].Id);
         Assert.True(result.Items[0].IsRepost);
         Assert.NotNull(result.Items[0].RepostedBy);
-        Assert.Equal(1, result.Items[0].RepostedBy.Id);
+        Assert.Equal(1, result.Items[0].RepostedBy!.Id);
+        Assert.Equal(1, result.Items[0].RepostCount);
 
         // 2nd: post2 (at t2)
         Assert.Equal(post2.Id, result.Items[1].Id);
         Assert.False(result.Items[1].IsRepost);
         Assert.Null(result.Items[1].RepostedBy);
+        Assert.Equal(0, result.Items[1].RepostCount);
 
         // 3rd: Original post1 (at t1)
         Assert.Equal(post1.Id, result.Items[2].Id);
         Assert.False(result.Items[2].IsRepost);
         Assert.Null(result.Items[2].RepostedBy);
+        Assert.Equal(1, result.Items[2].RepostCount);
     }
 
     [Fact]

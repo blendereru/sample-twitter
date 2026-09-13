@@ -244,6 +244,7 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.Null(item.ParentPost);
         Assert.False(item.IsRepost);
         Assert.Null(item.RepostedBy);
+        Assert.Equal(0, item.RepostCount);
     }
 
     [Fact]
@@ -286,6 +287,7 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.NotNull(item.RepostedBy);
         Assert.Equal(reposter.Id, item.RepostedBy!.Id);
         Assert.Equal("reposter@example.com", item.RepostedBy.Email);
+        Assert.Equal(1, item.RepostCount);
     }
 
     [Fact]
@@ -316,16 +318,19 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.True(body.Items[0].IsRepost);
         Assert.NotNull(body.Items[0].RepostedBy);
         Assert.Equal(user.Id, body.Items[0].RepostedBy!.Id);
+        Assert.Equal(1, body.Items[0].RepostCount);
 
         // Middle item: post2 (effective date t2)
         Assert.Equal(post2.Id, body.Items[1].Id);
         Assert.False(body.Items[1].IsRepost);
         Assert.Null(body.Items[1].RepostedBy);
+        Assert.Equal(0, body.Items[1].RepostCount);
 
         // Bottom item: Original post1 (effective date t1)
         Assert.Equal(post1.Id, body.Items[2].Id);
         Assert.False(body.Items[2].IsRepost);
         Assert.Null(body.Items[2].RepostedBy);
+        Assert.Equal(1, body.Items[2].RepostCount);
     }
 
     [Fact]
@@ -350,6 +355,7 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.Equal(post1.Id, item.Id);
         Assert.False(item.IsRepost);
         Assert.Null(item.RepostedBy);
+        Assert.Equal(1, item.RepostCount);
     }
 
     [Fact]

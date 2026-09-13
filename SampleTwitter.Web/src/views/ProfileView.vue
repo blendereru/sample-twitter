@@ -6,7 +6,7 @@ import TweetCard from '@/components/tweet/TweetCard.vue';
 import { getUserPosts } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostFeedItemDto } from '@/types/api';
+import type { PostFeedItemDto, RepostResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -97,14 +97,16 @@ function getAvatar(userId: number): string {
     : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80';
 }
 
-async function fetchFeed() {
+async function fetchFeed(options: { silent?: boolean } = {}) {
   if (!targetUserId.value || isNaN(targetUserId.value)) {
     error.value = 'Invalid user ID.';
     loading.value = false;
     return;
   }
 
-  loading.value = true;
+  if (!options.silent) {
+    loading.value = true;
+  }
   error.value = null;
   isNotFound.value = false;
 
@@ -120,7 +122,9 @@ async function fetchFeed() {
       error.value = parsed.detail || parsed.message || 'Failed to load posts.';
     }
   } finally {
-    loading.value = false;
+    if (!options.silent) {
+      loading.value = false;
+    }
   }
 }
 
@@ -139,6 +143,23 @@ function handlePostDeleted(id: number) {
     if (post.parentPost?.id === id) {
       post.parentPost = undefined;
     }
+  }
+}
+
+async function handlePostReposted(response: RepostResponse) {
+  // Optimistically increment repost count across any instances of this post in the feed
+  for (const p of posts.value) {
+    if (p.id === response.postId) {
+      p.repostCount = (p.repostCount || 0) + 1;
+    }
+    if (p.parentPost?.id === response.postId) {
+      p.parentPost.repostCount = (p.parentPost.repostCount || 0) + 1;
+    }
+  }
+
+  if (isMyProfile.value) {
+    // Silently re-sync the feed so the repost surfaces at the top without unmounting/flashing
+    await fetchFeed({ silent: true });
   }
 }
 
@@ -345,7 +366,7 @@ watch(
       <div v-else-if="error" class="p-6 text-center">
         <p class="text-sm text-red-400 mb-3">{{ error }}</p>
         <button
-          @click="fetchFeed"
+          @click="() => fetchFeed()"
           class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-700 hover:bg-neutral-800 text-xs font-semibold text-neutral-300 transition-colors"
         >
           <RefreshCw class="w-3.5 h-3.5" />
@@ -396,7 +417,9 @@ watch(
                 :image-url="post.parentPost.imageUrl"
                 :timestamp="formatDate(post.parentPost.createdAt)"
                 :updated-at="post.parentPost.updatedAt"
+                :retweets="post.parentPost.repostCount"
                 :can-edit="false"
+                @reposted="handlePostReposted"
                 class="!border-b-0 pb-2"
               />
               <!-- Connector line -->
@@ -420,9 +443,12 @@ watch(
             :image-url="post.imageUrl"
             :timestamp="formatDate(post.createdAt)"
             :updated-at="post.updatedAt"
+            :retweets="post.repostCount"
             :can-edit="!post.isRepost && (isMyProfile || (authStore.currentUserId !== null && Number(authStore.currentUserId) === post.author.id))"
+            :is-reposted="post.isRepost && isMyProfile"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
+            @reposted="handlePostReposted"
             class="!border-b-0"
           />
         </div>

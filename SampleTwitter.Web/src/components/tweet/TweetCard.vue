@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, MoreHorizontal, Trash2, UserX, VolumeX, Flag } from 'lucide-vue-next';
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, MoreHorizontal, Trash2, UserX, VolumeX, Flag, AlertCircle } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { editPost, deletePost } from '@/api/posts';
+import { editPost, deletePost, repostPost } from '@/api/posts';
 import { parseApiError } from '@/api/client';
+import type { RepostResponse } from '@/types/api';
 
 const props = defineProps<{
   id: number;
@@ -19,17 +21,79 @@ const props = defineProps<{
   likes?: number;
   retweets?: number;
   replies?: number;
+  isReposted?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'updated', post: { id: number; text?: string; imageUrl?: string; updatedAt?: string }): void;
   (e: 'delete', id: number): void;
+  (e: 'reposted', response: RepostResponse): void;
 }>();
 
+const router = useRouter();
 const authStore = useAuthStore();
 
 const liked = ref(false);
 const likeCount = ref(props.likes || 0);
+
+const isReposting = ref(false);
+const reposted = ref(props.isReposted ?? false);
+const repostCount = ref(props.retweets || 0);
+const repostError = ref<string | null>(null);
+
+watch(
+  () => props.retweets,
+  (newVal) => {
+    if (newVal !== undefined) repostCount.value = newVal;
+  }
+);
+
+watch(
+  () => props.isReposted,
+  (newVal) => {
+    if (newVal !== undefined) reposted.value = newVal;
+  }
+);
+
+async function handleRepost() {
+  if (isReposting.value) return;
+
+  if (!authStore.isAuthenticated) {
+    router.push('/signin');
+    return;
+  }
+
+  if (props.id <= 0) {
+    repostError.value = 'Cannot repost demo tweets.';
+    setTimeout(() => {
+      repostError.value = null;
+    }, 3000);
+    return;
+  }
+
+  isReposting.value = true;
+  repostError.value = null;
+
+  try {
+    const result = await repostPost(props.id);
+    reposted.value = true;
+    repostCount.value += 1;
+    emit('reposted', result);
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    if (parsed.status === 409) {
+      reposted.value = true;
+      repostError.value = 'You already reposted this post.';
+    } else {
+      repostError.value = parsed.detail || parsed.message || 'Failed to repost.';
+    }
+    setTimeout(() => {
+      repostError.value = null;
+    }, 4000);
+  } finally {
+    isReposting.value = false;
+  }
+}
 
 const menuOpen = ref(false);
 const menuRef = ref<HTMLElement | null>(null);
@@ -423,11 +487,21 @@ async function handleSave() {
             <span>{{ replies || 0 }}</span>
           </button>
 
-          <button class="flex items-center gap-1.5 hover:text-emerald-400 group transition-colors">
-            <div class="p-2 rounded-full group-hover:bg-emerald-500/10">
-              <Repeat2 class="w-4 h-4" />
+          <button
+            type="button"
+            @click.stop="handleRepost"
+            :disabled="isReposting"
+            :class="[
+              'flex items-center gap-1.5 group transition-colors',
+              reposted ? 'text-emerald-500' : 'hover:text-emerald-400 text-neutral-500'
+            ]"
+            :title="reposted ? 'Already reposted' : 'Repost'"
+          >
+            <div :class="['p-2 rounded-full transition-colors', reposted ? 'bg-emerald-500/10 text-emerald-500' : 'group-hover:bg-emerald-500/10']">
+              <Loader2 v-if="isReposting" class="w-4 h-4 animate-spin text-emerald-500" />
+              <Repeat2 v-else class="w-4 h-4" />
             </div>
-            <span>{{ retweets || 0 }}</span>
+            <span>{{ repostCount }}</span>
           </button>
 
           <button
@@ -451,6 +525,14 @@ async function handleSave() {
               <Share class="w-4 h-4" />
             </div>
           </button>
+        </div>
+
+        <div
+          v-if="repostError"
+          class="mt-2 text-xs text-amber-400 bg-amber-950/40 border border-amber-900/50 rounded-lg p-2 flex items-center gap-1.5"
+        >
+          <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+          <span>{{ repostError }}</span>
         </div>
       </template>
     </div>

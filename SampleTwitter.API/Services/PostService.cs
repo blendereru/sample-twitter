@@ -128,18 +128,34 @@ public class PostService : IPostService
             .Where(r => r.UserId == userId)
             .ToListAsync(ct);
 
+        var allPostIds = authoredPosts
+            .Select(p => p.Id)
+            .Concat(authoredPosts.Where(p => p.ReplyId.HasValue).Select(p => p.ReplyId!.Value))
+            .Concat(reposts.Select(r => r.PostId))
+            .Concat(reposts.Where(r => r.Post.ReplyId.HasValue).Select(r => r.Post.ReplyId!.Value))
+            .Distinct()
+            .ToList();
+
+        var repostCounts = allPostIds.Count > 0
+            ? await _applicationContext.Reposts
+                .Where(r => allPostIds.Contains(r.PostId))
+                .GroupBy(r => r.PostId)
+                .Select(g => new { PostId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
+            : new Dictionary<long, int>();
+
         var authoredItems = authoredPosts.Select(p => new
         {
             DisplayTimestamp = p.CreatedAt,
             p.Id,
-            Dto = MapToFeedItem(p)
+            Dto = MapToFeedItem(p, repostCounts)
         });
 
         var repostItems = reposts.Select(r => new
         {
             DisplayTimestamp = r.CreatedAt,
             Id = r.PostId,
-            Dto = MapToRepostFeedItem(r)
+            Dto = MapToRepostFeedItem(r, repostCounts)
         });
 
         var feed = authoredItems
@@ -220,7 +236,7 @@ public class PostService : IPostService
         return new RepostResult(repost.PostId, repost.UserId, repost.CreatedAt);
     }
 
-    private static PostFeedItemDto MapToFeedItem(Post post) =>
+    private static PostFeedItemDto MapToFeedItem(Post post, IReadOnlyDictionary<long, int> repostCounts) =>
         new(
             post.Id,
             post.Text,
@@ -228,12 +244,13 @@ public class PostService : IPostService
             post.CreatedAt,
             post.UpdatedAt,
             new PostAuthorDto(post.User.Id, post.User.Email),
-            post.Reply is not null ? MapToFeedItem(post.Reply) : null,
+            post.Reply is not null ? MapToFeedItem(post.Reply, repostCounts) : null,
             false,
-            null
+            null,
+            repostCounts.GetValueOrDefault(post.Id, 0)
         );
 
-    private static PostFeedItemDto MapToRepostFeedItem(Repost repost) =>
+    private static PostFeedItemDto MapToRepostFeedItem(Repost repost, IReadOnlyDictionary<long, int> repostCounts) =>
         new(
             repost.Post.Id,
             repost.Post.Text,
@@ -241,8 +258,9 @@ public class PostService : IPostService
             repost.Post.CreatedAt,
             repost.Post.UpdatedAt,
             new PostAuthorDto(repost.Post.User.Id, repost.Post.User.Email),
-            repost.Post.Reply is not null ? MapToFeedItem(repost.Post.Reply) : null,
+            repost.Post.Reply is not null ? MapToFeedItem(repost.Post.Reply, repostCounts) : null,
             true,
-            new PostAuthorDto(repost.User.Id, repost.User.Email)
+            new PostAuthorDto(repost.User.Id, repost.User.Email),
+            repostCounts.GetValueOrDefault(repost.Post.Id, 0)
         );
 }
