@@ -145,18 +145,26 @@ public class PostService : IPostService
                 .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
             : new Dictionary<long, int>();
 
+        var replyCounts = allPostIds.Count > 0
+            ? await _applicationContext.Posts
+                .Where(p => p.ReplyId.HasValue && allPostIds.Contains(p.ReplyId.Value))
+                .GroupBy(p => p.ReplyId!.Value)
+                .Select(g => new { PostId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
+            : new Dictionary<long, int>();
+
         var authoredItems = authoredPosts.Select(p => new
         {
             DisplayTimestamp = p.CreatedAt,
             p.Id,
-            Dto = MapToFeedItem(p, repostCounts)
+            Dto = MapToFeedItem(p, repostCounts, replyCounts)
         });
 
         var repostItems = reposts.Select(r => new
         {
             DisplayTimestamp = r.CreatedAt,
             Id = r.PostId,
-            Dto = MapToRepostFeedItem(r, repostCounts)
+            Dto = MapToRepostFeedItem(r, repostCounts, replyCounts)
         });
 
         var feed = authoredItems
@@ -255,7 +263,48 @@ public class PostService : IPostService
         _logger.LogInformation("Repost for post {PostId} by user {UserId} undone", postId, userId);
     }
 
-    private static PostFeedItemDto MapToFeedItem(Post post, IReadOnlyDictionary<long, int> repostCounts) =>
+    public async Task<PostFeedResult> GetReplies(long postId, CancellationToken ct = default)
+    {
+        if (!await _applicationContext.Posts.AnyAsync(p => p.Id == postId, ct))
+        {
+            _logger.LogWarning("Replies requested for non-existent post {PostId}", postId);
+            throw new PostNotFoundException($"Post with id {postId} was not found.");
+        }
+
+        var replies = await _applicationContext.Posts
+            .AsNoTracking()
+            .Include(p => p.User)
+            .Where(p => p.ReplyId == postId)
+            .OrderBy(p => p.CreatedAt)
+            .ToListAsync(ct);
+
+        var replyIds = replies.Select(p => p.Id).ToList();
+
+        var repostCounts = replyIds.Count > 0
+            ? await _applicationContext.Reposts
+                .Where(r => replyIds.Contains(r.PostId))
+                .GroupBy(r => r.PostId)
+                .Select(g => new { PostId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
+            : new Dictionary<long, int>();
+
+        var replyCounts = replyIds.Count > 0
+            ? await _applicationContext.Posts
+                .Where(p => p.ReplyId.HasValue && replyIds.Contains(p.ReplyId.Value))
+                .GroupBy(p => p.ReplyId!.Value)
+                .Select(g => new { PostId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
+            : new Dictionary<long, int>();
+
+        var items = replies
+            .Select(r => MapToFeedItem(r, repostCounts, replyCounts))
+            .ToList();
+
+        return new PostFeedResult(items);
+    }
+
+    private static PostFeedItemDto MapToFeedItem(Post post, IReadOnlyDictionary<long, int> repostCounts,
+        IReadOnlyDictionary<long, int> replyCounts) =>
         new(
             post.Id,
             post.Text,
@@ -263,13 +312,17 @@ public class PostService : IPostService
             post.CreatedAt,
             post.UpdatedAt,
             new PostAuthorDto(post.User.Id, post.User.Email),
-            post.Reply is not null ? MapToFeedItem(post.Reply, repostCounts) : null,
+            post.Reply is not null ? MapToFeedItem(post.Reply, repostCounts, replyCounts) : null,
             false,
             null,
-            repostCounts.GetValueOrDefault(post.Id, 0)
+            repostCounts.GetValueOrDefault(post.Id, 0),
+            replyCounts.GetValueOrDefault(post.Id, 0)
         );
 
-    private static PostFeedItemDto MapToRepostFeedItem(Repost repost, IReadOnlyDictionary<long, int> repostCounts) =>
+    private static PostFeedItemDto MapToRepostFeedItem(
+        Repost repost,
+        IReadOnlyDictionary<long, int> repostCounts,
+        IReadOnlyDictionary<long, int> replyCounts) =>
         new(
             repost.Post.Id,
             repost.Post.Text,
@@ -277,9 +330,10 @@ public class PostService : IPostService
             repost.Post.CreatedAt,
             repost.Post.UpdatedAt,
             new PostAuthorDto(repost.Post.User.Id, repost.Post.User.Email),
-            repost.Post.Reply is not null ? MapToFeedItem(repost.Post.Reply, repostCounts) : null,
+            repost.Post.Reply is not null ? MapToFeedItem(repost.Post.Reply, repostCounts, replyCounts) : null,
             true,
             new PostAuthorDto(repost.User.Id, repost.User.Email),
-            repostCounts.GetValueOrDefault(repost.Post.Id, 0)
+            repostCounts.GetValueOrDefault(repost.Post.Id, 0),
+            replyCounts.GetValueOrDefault(repost.Post.Id, 0)
         );
 }

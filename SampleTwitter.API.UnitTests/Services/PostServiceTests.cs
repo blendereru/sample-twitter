@@ -661,6 +661,102 @@ public class PostServiceTests : IDisposable
         Assert.Equal(2, user2Item.RepostedBy.Id);
     }
 
+    [Fact]
+    public async Task GetReplies_PostDoesNotExist_ThrowsPostNotFoundException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(
+            () => _sut.GetReplies(postId: 99999));
+    }
+
+    [Fact]
+    public async Task GetReplies_PostExistsWithNoReplies_ReturnsEmptyList()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "lonely post");
+
+        // Act
+        var result = await _sut.GetReplies(post.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetReplies_PostHasReplies_ReturnsRepliesInChronologicalOrderWithAccurateCounts()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "root post");
+        var t1 = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var t2 = DateTimeOffset.UtcNow.AddMinutes(-5);
+
+        var reply1 = await SeedPost(userId: 2, text: "first reply", replyId: post.Id, createdAt: t1);
+        var reply2 = await SeedPost(userId: 3, text: "second reply", replyId: post.Id, createdAt: t2);
+
+        // Repost on reply1
+        await SeedRepost(postId: reply1.Id, userId: 4);
+
+        // Nested reply on reply1
+        await SeedPost(userId: 5, text: "nested reply to reply1", replyId: reply1.Id);
+
+        // Act
+        var result = await _sut.GetReplies(post.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Items.Count);
+
+        var first = result.Items[0];
+        Assert.Equal(reply1.Id, first.Id);
+        Assert.Equal("first reply", first.Text);
+        Assert.Equal(1, first.RepostCount);
+        Assert.Equal(1, first.ReplyCount);
+
+        var second = result.Items[1];
+        Assert.Equal(reply2.Id, second.Id);
+        Assert.Equal("second reply", second.Text);
+        Assert.Equal(0, second.RepostCount);
+        Assert.Equal(0, second.ReplyCount);
+    }
+
+    [Fact]
+    public async Task GetReplies_SoftDeletedReplies_ExcludedFromResults()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "parent post");
+        var activeReply = await SeedPost(userId: 2, text: "active reply", replyId: post.Id);
+        var deletedReply = await SeedPost(userId: 3, text: "deleted reply", replyId: post.Id);
+        deletedReply.IsDeleted = true;
+        deletedReply.DeletedAt = DateTimeOffset.UtcNow;
+        await _applicationContext.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetReplies(post.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        var item = Assert.Single(result.Items);
+        Assert.Equal(activeReply.Id, item.Id);
+    }
+
+    [Fact]
+    public async Task GetProfileFeed_PopulatesReplyCount()
+    {
+        // Arrange
+        var post = await SeedPost(userId: 1, text: "post with reply");
+        await SeedPost(userId: 2, text: "reply to post", replyId: post.Id);
+
+        // Act
+        var result = await _sut.GetProfileFeed(userId: 1);
+
+        // Assert
+        Assert.NotNull(result);
+        var item = Assert.Single(result.Items);
+        Assert.Equal(post.Id, item.Id);
+        Assert.Equal(1, item.ReplyCount);
+    }
+
     private async Task<Repost> SeedRepost(long postId, long userId, DateTimeOffset? createdAt = null)
     {
         await SeedUser(userId, $"user{userId}@example.com");

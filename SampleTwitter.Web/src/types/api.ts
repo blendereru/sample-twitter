@@ -74,6 +74,7 @@ export interface PostFeedItemDto {
   isRepost: boolean;
   repostedBy?: PostAuthorDto;
   repostCount: number;
+  replyCount: number;
 }
 
 export interface PostFeedResponse {

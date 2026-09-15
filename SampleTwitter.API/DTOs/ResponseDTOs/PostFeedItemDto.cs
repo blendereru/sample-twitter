@@ -1,7 +1,7 @@
 namespace SampleTwitter.API.DTOs.ResponseDTOs;
 
 /// <summary>
-/// Represents a single post in the profile feed.
+/// Represents a single post in a feed.
 /// </summary>
 /// <param name="Id">The unique identifier of the post.</param>
 /// <param name="Text">The text content of the post.</param>
@@ -13,6 +13,7 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="IsRepost">Indicates whether this item appears in the feed as a repost.</param>
 /// <param name="RepostedBy">The user who reposted this post, if this item is a repost.</param>
 /// <param name="RepostCount">The total number of reposts this post has received.</param>
+/// <param name="ReplyCount">The total number of direct replies this post has received.</param>
 public record PostFeedItemDto(
     long Id,
     string? Text,
@@ -23,5 +24,6 @@ public record PostFeedItemDto(
     PostFeedItemDto? ParentPost,
     bool IsRepost,
     PostAuthorDto? RepostedBy,
-    int RepostCount
+    int RepostCount,
+    int ReplyCount
 );

@@ -166,6 +166,24 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves all direct replies to the specified post.
+    /// </summary>
+    /// <param name="id">The ID of the post whose replies to retrieve.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The replies were retrieved successfully.</response>
+    /// <response code="404">No post exists with the given ID.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpGet("{id}/replies")]
+    [ProducesResponseType(typeof(PostFeedResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReplies(long id, CancellationToken ct)
+    {
+        var result = await _postService.GetReplies(id, ct);
+        return Ok(new PostFeedResponse(result.Items));
+    }
+
+    /// <summary>
     /// Retrieves a post by its ID.
     /// </summary>
     /// <response code="200">The post was found.</response>
