@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare, Repeat2 } from 'lucide-vue-next';
+import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import { getUserPosts } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostFeedItemDto, RepostResponse } from '@/types/api';
+import type { PostFeedItemDto, PostAuthorDto, RepostResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -28,29 +28,21 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const isNotFound = ref(false);
 const posts = ref<PostFeedItemDto[]>([]);
+const profileAuthor = ref<PostAuthorDto | null>(null);
 const activeTab = ref<'posts' | 'replies' | 'highlights' | 'media' | 'likes'>('posts');
 
 const profileEmail = computed(() => {
+  if (profileAuthor.value?.email) {
+    return profileAuthor.value.email;
+  }
   if (isMyProfile.value && authStore.currentUserEmail) {
     return authStore.currentUserEmail;
-  }
-  if (posts.value.length > 0) {
-    const first = posts.value[0];
-    return first.isRepost && first.repostedBy ? first.repostedBy.email : first.author.email;
   }
   return `user${targetUserId.value}@example.com`;
 });
 
 const profileDisplayName = computed(() => {
-  if (isMyProfile.value && authStore.currentUserEmail) {
-    return authStore.currentUserEmail.split('@')[0];
-  }
-  if (posts.value.length > 0) {
-    const first = posts.value[0];
-    const email = first.isRepost && first.repostedBy ? first.repostedBy.email : first.author.email;
-    return email.split('@')[0];
-  }
-  return `User #${targetUserId.value}`;
+  return profileEmail.value.split('@')[0];
 });
 
 const joinedText = computed(() => {
@@ -113,7 +105,7 @@ async function fetchFeed(options: { silent?: boolean } = {}) {
   try {
     const response = await getUserPosts(targetUserId.value);
     posts.value = response.items || [];
-    updateRepostedPostIds(posts.value);
+    profileAuthor.value = response.author || null;
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     if (parsed.status === 404) {
@@ -131,17 +123,6 @@ async function fetchFeed(options: { silent?: boolean } = {}) {
 
 const myRepostedPostIds = ref<Set<number>>(new Set());
 
-function updateRepostedPostIds(items: PostFeedItemDto[]) {
-  const currentId = authStore.currentUserId;
-  const newSet = new Set<number>();
-  for (const p of items) {
-    if (p.isRepost && (isMyProfile.value || (currentId !== null && p.repostedBy?.id === Number(currentId)))) {
-      newSet.add(p.id);
-    }
-  }
-  myRepostedPostIds.value = newSet;
-}
-
 function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
   const item = posts.value.find(p => p.id === updated.id);
   if (item) {
@@ -153,50 +134,25 @@ function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: stri
 
 function handlePostDeleted(id: number) {
   posts.value = posts.value.filter(p => p.id !== id);
-  for (const post of posts.value) {
-    if (post.parentPost?.id === id) {
-      post.parentPost = undefined;
-    }
-  }
 }
 
-async function handlePostReposted(response: RepostResponse) {
+function handlePostReposted(response: RepostResponse) {
   myRepostedPostIds.value.add(response.postId);
 
-  // Optimistically increment repost count across any instances of this post in the feed
   for (const p of posts.value) {
     if (p.id === response.postId) {
       p.repostCount = (p.repostCount || 0) + 1;
     }
-    if (p.parentPost?.id === response.postId) {
-      p.parentPost.repostCount = (p.parentPost.repostCount || 0) + 1;
-    }
-  }
-
-  if (isMyProfile.value) {
-    // Silently re-sync the feed so the repost surfaces at the top without unmounting/flashing
-    await fetchFeed({ silent: true });
   }
 }
 
-async function handlePostUndoReposted(postId: number) {
+function handlePostUndoReposted(postId: number) {
   myRepostedPostIds.value.delete(postId);
 
-  // Optimistically decrement repost count across any instances of this post in the feed
   for (const p of posts.value) {
     if (p.id === postId) {
       p.repostCount = Math.max(0, (p.repostCount || 0) - 1);
     }
-    if (p.parentPost?.id === postId) {
-      p.parentPost.repostCount = Math.max(0, (p.parentPost.repostCount || 0) - 1);
-    }
-  }
-
-  if (isMyProfile.value) {
-    // Remove the repost entry from profile feed immediately
-    posts.value = posts.value.filter(p => !(p.isRepost && p.id === postId));
-    // Silently re-sync the feed in background
-    await fetchFeed({ silent: true });
   }
 }
 
@@ -411,6 +367,17 @@ watch(
         </button>
       </div>
 
+      <!-- Non-Posts Tab Empty State -->
+      <div v-else-if="activeTab !== 'posts'" class="flex flex-col items-center justify-center p-12 text-center">
+        <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
+          <MessageSquare class="w-8 h-8 text-neutral-600" />
+        </div>
+        <h3 class="text-xl font-bold mb-1">No {{ activeTab }} yet</h3>
+        <p class="text-neutral-500 text-sm max-w-xs">
+          When there are {{ activeTab }} to display, they will show up here.
+        </p>
+      </div>
+
       <!-- Empty State -->
       <div v-else-if="posts.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
         <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
@@ -418,7 +385,7 @@ watch(
         </div>
         <h3 class="text-xl font-bold mb-1">No posts yet</h3>
         <p class="text-neutral-500 text-sm max-w-xs">
-          {{ isMyProfile ? "When you post, your posts and thread replies will show up here." : "When this user posts, their posts will show up here." }}
+          {{ isMyProfile ? "When you post, your posts will show up here." : "When this user posts, their posts will show up here." }}
         </p>
       </div>
 
@@ -426,67 +393,24 @@ watch(
       <div v-else class="flex flex-col">
         <div
           v-for="post in posts"
-          :key="(post.isRepost ? 'feed-repost-' : 'feed-post-') + post.id"
+          :key="post.id"
           class="flex flex-col border-b border-neutral-800"
         >
-          <!-- Repost Context Badge -->
-          <div v-if="post.isRepost" class="px-4 pt-2.5 flex items-center gap-2 text-xs font-semibold text-neutral-500">
-            <Repeat2 class="w-3.5 h-3.5 text-neutral-500" />
-            <span>{{ isMyProfile ? 'You reposted' : `${post.repostedBy?.email.split('@')[0] ?? 'User'} reposted` }}</span>
-          </div>
-
-          <!-- Self-thread parent post context if present -->
-          <div v-if="post.parentPost" class="relative bg-neutral-950/20">
-            <div class="px-4 pt-2.5 flex items-center gap-2 text-xs text-neutral-500">
-              <span class="inline-block w-2 h-2 rounded-full bg-sky-500/80"></span>
-              <span>Thread root</span>
-            </div>
-
-            <!-- Parent Post Card -->
-            <div class="relative">
-              <TweetCard
-                :id="post.parentPost.id"
-                :user-id="post.parentPost.author.id"
-                :author="post.parentPost.author.email.split('@')[0]"
-                :handle="'@' + post.parentPost.author.email"
-                :avatar="getAvatar(post.parentPost.author.id)"
-                :content="post.parentPost.text || ''"
-                :image-url="post.parentPost.imageUrl"
-                :timestamp="formatDate(post.parentPost.createdAt)"
-                :updated-at="post.parentPost.updatedAt"
-                :retweets="post.parentPost.repostCount"
-                :replies="post.parentPost.replyCount"
-                :can-edit="false"
-                :is-reposted="myRepostedPostIds.has(post.parentPost.id)"
-                @reposted="handlePostReposted"
-                @undo-repost="handlePostUndoReposted"
-                class="!border-b-0 pb-2"
-              />
-              <!-- Connector line -->
-              <div class="absolute left-9 top-14 bottom-0 w-0.5 bg-neutral-700"></div>
-            </div>
-
-            <!-- Replying indicator -->
-            <div class="px-4 pb-1 pl-16 text-xs text-neutral-500">
-              Replying to <span class="text-sky-400">@{{ post.parentPost.author.email }}</span>
-            </div>
-          </div>
-
           <!-- Main Post Card -->
           <TweetCard
             :id="post.id"
-            :user-id="post.author.id"
-            :author="post.author.email.split('@')[0]"
-            :handle="'@' + post.author.email"
-            :avatar="getAvatar(post.author.id)"
+            :user-id="profileAuthor?.id ?? targetUserId"
+            :author="profileDisplayName"
+            :handle="'@' + profileEmail"
+            :avatar="getAvatar(profileAuthor?.id ?? targetUserId)"
             :content="post.text || ''"
             :image-url="post.imageUrl"
             :timestamp="formatDate(post.createdAt)"
             :updated-at="post.updatedAt"
             :retweets="post.repostCount"
             :replies="post.replyCount"
-            :can-edit="!post.isRepost && (isMyProfile || (authStore.currentUserId !== null && Number(authStore.currentUserId) === post.author.id))"
-            :is-reposted="myRepostedPostIds.has(post.id) || (post.isRepost && isMyProfile)"
+            :can-edit="isMyProfile"
+            :is-reposted="myRepostedPostIds.has(post.id)"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
             @reposted="handlePostReposted"

@@ -69,16 +69,13 @@ export interface PostFeedItemDto {
   imageUrl?: string;
   createdAt: string;
   updatedAt?: string;
-  author: PostAuthorDto;
-  parentPost?: PostFeedItemDto;
-  isRepost: boolean;
-  repostedBy?: PostAuthorDto;
   repostCount: number;
   replyCount: number;
 }
 
 export interface PostFeedResponse {
   items: PostFeedItemDto[];
+  author: PostAuthorDto;
 }
 
 
