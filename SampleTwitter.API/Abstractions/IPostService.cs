@@ -11,4 +11,5 @@ public interface IPostService
     Task Delete(long postId, long userId, CancellationToken ct = default);
     Task<RepostResult> Repost(long postId, long userId, CancellationToken ct = default);
     Task UndoRepost(long postId, long userId, CancellationToken ct = default);
+    Task<PostResult> GetById(long id, CancellationToken ct = default);
 }

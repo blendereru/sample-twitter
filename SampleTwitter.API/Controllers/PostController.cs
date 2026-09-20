@@ -171,12 +171,24 @@ public class PostController : ControllerBase
     /// <response code="200">The post was found.</response>
     /// <response code="404">No post exists with the given ID.</response>
     /// <response code="500">An unexpected error occurred while processing the request.</response>
-    [HttpGet("{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(PostResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetById(long id)
+    public async Task<IActionResult> GetById(long id, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        var result = await _postService.GetById(id, ct);
+
+        var response = new PostResponse(
+            result.Id,
+            result.Text,
+            result.ImageUrl,
+            result.CreatedAt,
+            result.UpdatedAt,
+            new PostAuthorDto(result.Author.Id, result.Author.Email),
+            result.ReplyId,
+            result.RepostCount,
+            result.ReplyCount);
+
+        return Ok(response);
     }
 }

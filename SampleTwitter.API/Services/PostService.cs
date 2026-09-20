@@ -213,4 +213,29 @@ public class PostService : IPostService
 
         _logger.LogInformation("Repost for post {PostId} by user {UserId} undone", postId, userId);
     }
+
+    public async Task<PostResult> GetById(long id, CancellationToken ct = default)
+    {
+        var post = await _applicationContext.Posts
+            .Where(p => p.Id == id)
+            .Select(p => new PostResult(
+                p.Id,
+                p.Text,
+                p.ImageUrl,
+                p.CreatedAt,
+                p.UpdatedAt,
+                new PostAuthorResult(p.User.Id, p.User.Email),
+                p.ReplyId,
+                p.Reposts.Count,
+                p.Replies.Count))
+            .SingleOrDefaultAsync(ct);
+
+        if (post is null)
+        {
+            _logger.LogWarning("Post {PostId} not found", id);
+            throw new PostNotFoundException($"Post with id {id} was not found.");
+        }
+
+        return post;
+    }
 }

@@ -6,7 +6,6 @@ public class SecureTokenGeneratorTests
 {
     private readonly SecureTokenGenerator _sut = new();
 
-    
     [Fact]
     public void Generate_OutputContainsNoStandardBase64Characters()
     {

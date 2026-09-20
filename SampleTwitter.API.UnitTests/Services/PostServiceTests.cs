@@ -370,6 +370,13 @@ public class PostServiceTests : IDisposable
         Assert.Equal(post1.Id, result.Items[1].Id);
     }
 
+    [Fact]
+    public async Task GetPost_NonExistentPost_ThrowsPostNotFoundException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<PostNotFoundException>(() => _sut.GetById(id: 99999));
+    }
+
     private async Task<Repost> SeedRepost(long postId, long userId, DateTimeOffset? createdAt = null)
     {
         await SeedUser(userId, $"user{userId}@example.com");
