@@ -99,82 +99,33 @@ public class PostService : IPostService
             post.UpdatedAt);
     }
 
-    public async Task<PostFeedResult> GetProfileFeed(
-        long userId,
-        CancellationToken ct = default)
+    public async Task<ProfilePostFeedResult> GetPosts(long userId, CancellationToken ct = default)
     {
-        if (!await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
+        var user = await _applicationContext.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(u => u.Id == userId, ct);
+
+        if (user is null)
         {
             _logger.LogWarning("Profile feed requested for non-existent user {UserId}", userId);
             throw new UserNotFoundException($"User with id {userId} was not found.");
         }
 
-        var authoredPosts = await _applicationContext.Posts
-            .AsNoTracking()
-            .Include(p => p.User)
-            .Include(p => p.Reply!)
-                .ThenInclude(r => r.User)
-            .Where(p => p.UserId == userId
-                        && (p.ReplyId == null || p.Reply!.UserId == userId))
+        var posts = await _applicationContext.Posts
+            .Where(p => p.UserId == user.Id && p.ReplyId == null)
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new PostFeedItemDto(
+                    p.Id,
+                    p.Text,
+                    p.ImageUrl,
+                    p.CreatedAt,
+                    p.UpdatedAt,
+                    p.Reposts.Count,
+                    p.Replies.Count))
             .ToListAsync(ct);
 
-        var reposts = await _applicationContext.Reposts
-            .AsNoTracking()
-            .Include(r => r.User)
-            .Include(r => r.Post)
-                .ThenInclude(p => p.User)
-            .Include(r => r.Post)
-                .ThenInclude(p => p.Reply!)
-                    .ThenInclude(r => r.User)
-            .Where(r => r.UserId == userId)
-            .ToListAsync(ct);
-
-        var allPostIds = authoredPosts
-            .Select(p => p.Id)
-            .Concat(authoredPosts.Where(p => p.ReplyId.HasValue).Select(p => p.ReplyId!.Value))
-            .Concat(reposts.Select(r => r.PostId))
-            .Concat(reposts.Where(r => r.Post.ReplyId.HasValue).Select(r => r.Post.ReplyId!.Value))
-            .Distinct()
-            .ToList();
-
-        var repostCounts = allPostIds.Count > 0
-            ? await _applicationContext.Reposts
-                .Where(r => allPostIds.Contains(r.PostId))
-                .GroupBy(r => r.PostId)
-                .Select(g => new { PostId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
-            : new Dictionary<long, int>();
-
-        var replyCounts = allPostIds.Count > 0
-            ? await _applicationContext.Posts
-                .Where(p => p.ReplyId.HasValue && allPostIds.Contains(p.ReplyId.Value))
-                .GroupBy(p => p.ReplyId!.Value)
-                .Select(g => new { PostId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
-            : new Dictionary<long, int>();
-
-        var authoredItems = authoredPosts.Select(p => new
-        {
-            DisplayTimestamp = p.CreatedAt,
-            p.Id,
-            Dto = MapToFeedItem(p, repostCounts, replyCounts)
-        });
-
-        var repostItems = reposts.Select(r => new
-        {
-            DisplayTimestamp = r.CreatedAt,
-            Id = r.PostId,
-            Dto = MapToRepostFeedItem(r, repostCounts, replyCounts)
-        });
-
-        var feed = authoredItems
-            .Concat(repostItems)
-            .OrderByDescending(x => x.DisplayTimestamp)
-            .ThenByDescending(x => x.Id)
-            .Select(x => x.Dto)
-            .ToList();
-
-        return new PostFeedResult(feed);
+        return new ProfilePostFeedResult(posts, new PostAuthorDto(user.Id, user.Email));
     }
 
     public async Task Delete(long postId, long userId, CancellationToken ct = default)
@@ -262,78 +213,4 @@ public class PostService : IPostService
 
         _logger.LogInformation("Repost for post {PostId} by user {UserId} undone", postId, userId);
     }
-
-    public async Task<PostFeedResult> GetReplies(long postId, CancellationToken ct = default)
-    {
-        if (!await _applicationContext.Posts.AnyAsync(p => p.Id == postId, ct))
-        {
-            _logger.LogWarning("Replies requested for non-existent post {PostId}", postId);
-            throw new PostNotFoundException($"Post with id {postId} was not found.");
-        }
-
-        var replies = await _applicationContext.Posts
-            .AsNoTracking()
-            .Include(p => p.User)
-            .Where(p => p.ReplyId == postId)
-            .OrderBy(p => p.CreatedAt)
-            .ToListAsync(ct);
-
-        var replyIds = replies.Select(p => p.Id).ToList();
-
-        var repostCounts = replyIds.Count > 0
-            ? await _applicationContext.Reposts
-                .Where(r => replyIds.Contains(r.PostId))
-                .GroupBy(r => r.PostId)
-                .Select(g => new { PostId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
-            : new Dictionary<long, int>();
-
-        var replyCounts = replyIds.Count > 0
-            ? await _applicationContext.Posts
-                .Where(p => p.ReplyId.HasValue && replyIds.Contains(p.ReplyId.Value))
-                .GroupBy(p => p.ReplyId!.Value)
-                .Select(g => new { PostId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.PostId, x => x.Count, ct)
-            : new Dictionary<long, int>();
-
-        var items = replies
-            .Select(r => MapToFeedItem(r, repostCounts, replyCounts))
-            .ToList();
-
-        return new PostFeedResult(items);
-    }
-
-    private static PostFeedItemDto MapToFeedItem(Post post, IReadOnlyDictionary<long, int> repostCounts,
-        IReadOnlyDictionary<long, int> replyCounts) =>
-        new(
-            post.Id,
-            post.Text,
-            post.ImageUrl,
-            post.CreatedAt,
-            post.UpdatedAt,
-            new PostAuthorDto(post.User.Id, post.User.Email),
-            post.Reply is not null ? MapToFeedItem(post.Reply, repostCounts, replyCounts) : null,
-            false,
-            null,
-            repostCounts.GetValueOrDefault(post.Id, 0),
-            replyCounts.GetValueOrDefault(post.Id, 0)
-        );
-
-    private static PostFeedItemDto MapToRepostFeedItem(
-        Repost repost,
-        IReadOnlyDictionary<long, int> repostCounts,
-        IReadOnlyDictionary<long, int> replyCounts) =>
-        new(
-            repost.Post.Id,
-            repost.Post.Text,
-            repost.Post.ImageUrl,
-            repost.Post.CreatedAt,
-            repost.Post.UpdatedAt,
-            new PostAuthorDto(repost.Post.User.Id, repost.Post.User.Email),
-            repost.Post.Reply is not null ? MapToFeedItem(repost.Post.Reply, repostCounts, replyCounts) : null,
-            true,
-            new PostAuthorDto(repost.User.Id, repost.User.Email),
-            repostCounts.GetValueOrDefault(repost.Post.Id, 0),
-            replyCounts.GetValueOrDefault(repost.Post.Id, 0)
-        );
 }

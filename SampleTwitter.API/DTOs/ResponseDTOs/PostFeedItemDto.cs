@@ -8,10 +8,6 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="ImageUrl">Optional image attachment URL.</param>
 /// <param name="CreatedAt">The date and time when the post was originally created.</param>
 /// <param name="UpdatedAt">The date and time when the post was last edited, or null if never edited.</param>
-/// <param name="Author">The author of the post.</param>
-/// <param name="ParentPost">Parent post context if this post is a continuation of a self-thread.</param>
-/// <param name="IsRepost">Indicates whether this item appears in the feed as a repost.</param>
-/// <param name="RepostedBy">The user who reposted this post, if this item is a repost.</param>
 /// <param name="RepostCount">The total number of reposts this post has received.</param>
 /// <param name="ReplyCount">The total number of direct replies this post has received.</param>
 public record PostFeedItemDto(
@@ -20,10 +16,6 @@ public record PostFeedItemDto(
     string? ImageUrl,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
-    PostAuthorDto Author,
-    PostFeedItemDto? ParentPost,
-    bool IsRepost,
-    PostAuthorDto? RepostedBy,
     int RepostCount,
     int ReplyCount
 );

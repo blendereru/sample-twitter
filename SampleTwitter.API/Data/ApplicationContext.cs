@@ -56,10 +56,11 @@ public class ApplicationContext : DbContext
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasOne(p => p.Reply)
-                .WithMany()
+            modelBuilder.Entity<Post>()
+                .HasOne(p => p.Reply)
+                .WithMany(p => p.Replies)
                 .HasForeignKey(p => p.ReplyId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasIndex(p => new { p.UserId, p.CreatedAt });
             builder.HasIndex(p => p.ReplyId);
