@@ -48,7 +48,7 @@ public class AccountController : ControllerBase
             "Registration successful. Please check your email to confirm your account.");
 
         return result.IsNewRegistration
-            ? CreatedAtAction(nameof(GetUser), new { id = result.UserId }, payload)
+            ? CreatedAtAction(actionName: "GetUser", controllerName: "Users",  new { id = result.UserId }, payload)
             : Ok(payload);
     }
 
@@ -150,11 +150,5 @@ public class AccountController : ControllerBase
         var result = await _accountService.GetUserById(userId, ct);
 
         return Ok(new MeResponse(result.Id, result.Email, result.RegisteredAt));
-    }
-
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetUser(long id)
-    {
-        throw new NotImplementedException();
     }
 }

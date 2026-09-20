@@ -16,7 +16,7 @@ public class AccountService : IAccountService
     private readonly IEmailConfirmationService _emailConfirmationService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<AccountService> _logger;
-    public AccountService(ApplicationContext applicationContext, IEmailConfirmationService emailConfirmationService, 
+    public AccountService(ApplicationContext applicationContext, IEmailConfirmationService emailConfirmationService,
         IPasswordHasher passwordHasher, ILogger<AccountService> logger)
     {
         _applicationContext = applicationContext;
@@ -24,7 +24,7 @@ public class AccountService : IAccountService
         _passwordHasher = passwordHasher;
         _logger = logger;
     }
-    
+
     public async Task<RegisterResult> Register(SignUpRequest request, CancellationToken ct = default)
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -82,7 +82,7 @@ public class AccountService : IAccountService
 
         return new RegisterResult(user.Id, user.Email, IsNewRegistration: true);
     }
-    
+
     public async Task<LoginResult> Login(LoginRequest request, CancellationToken ct = default)
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -120,6 +120,7 @@ public class AccountService : IAccountService
     public async Task<UserResult> GetUserById(long userId, CancellationToken ct = default)
     {
         var user = await _applicationContext.Users
+            .AsNoTracking()
             .SingleOrDefaultAsync(u => u.Id == userId, ct);
 
         if (user is null)

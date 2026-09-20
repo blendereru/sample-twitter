@@ -10,10 +10,12 @@ namespace SampleTwitter.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IPostService _postService;
+    private readonly IAccountService _accountService;
 
-    public UsersController(IPostService postService)
+    public UsersController(IPostService postService, IAccountService accountService)
     {
         _postService = postService;
+        _accountService = accountService;
     }
 
     /// <summary>
@@ -33,5 +35,23 @@ public class UsersController : ControllerBase
     {
         var feed = await _postService.GetPosts(userId, ct);
         return Ok(new PostFeedResponse(feed.Items, feed.Author));
+    }
+
+    /// <summary>
+    /// Returns the user info for the given user.
+    /// </summary>
+    /// <param name="id">The ID of the user to retrieve info about</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <response code="200">User returned successfully</response>
+    /// <response code="404">User is not found (an account was deleted or invalid userId)</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetUser(long id, CancellationToken ct)
+    {
+        var user = await _accountService.GetUserById(id, ct);
+        return Ok(new UserResponse(user.Id, user.Email, user.RegisteredAt));
     }
 }
