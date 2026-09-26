@@ -1,10 +1,10 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
+using SampleTwitter.API.Options;
 using SampleTwitter.API.Services;
 using SampleTwitter.API.UnitTests.Helpers;
 
@@ -15,7 +15,7 @@ public class EmailConfirmationServiceTests : IDisposable
     private readonly ApplicationContext _applicationContext;
     private readonly Mock<ISecureTokenGenerator> _tokenGeneratorMock;
     private readonly Mock<IEmailSender> _emailSenderMock;
-    private readonly Mock<IConfiguration> _configurationMock;
+    private readonly Mock<AppOptions> _appOptionsMock;
     private readonly IEmailConfirmationService _sut;
 
     public EmailConfirmationServiceTests()
@@ -23,14 +23,14 @@ public class EmailConfirmationServiceTests : IDisposable
         _applicationContext = TestDbContextFactory.Create();
         _tokenGeneratorMock = new Mock<ISecureTokenGenerator>();
         _emailSenderMock = new Mock<IEmailSender>();
-        _configurationMock = new Mock<IConfiguration>();
-        _configurationMock.Setup(c => c["AppSettings:BaseUrl"]).Returns("https://sampletwitter.com");
+        _appOptionsMock = new Mock<AppOptions>();
+        _appOptionsMock.Setup(o => o.BaseUrl).Returns("https://sampletwitter.com");
 
         _sut = new EmailConfirmationService(
             _applicationContext,
             _tokenGeneratorMock.Object,
             _emailSenderMock.Object,
-            _configurationMock.Object,
+            _appOptionsMock.Object,
             NullLogger<EmailConfirmationService>.Instance);
     }
 
