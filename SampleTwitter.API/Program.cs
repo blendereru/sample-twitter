@@ -44,6 +44,7 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("AppSettings"));
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddExceptionHandler<FallbackExceptionHandler>();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -63,7 +64,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return Task.CompletedTask;
         };
-        
+
         options.Events.OnRedirectToAccessDenied = context =>
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -77,7 +78,7 @@ app.UseHttpsRedirection();
 app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();     
+    app.MapOpenApi();
     app.MapScalarApiReference(options =>
     {
         options

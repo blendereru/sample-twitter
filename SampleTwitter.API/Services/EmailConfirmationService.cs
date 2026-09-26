@@ -3,6 +3,7 @@ using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
+using SampleTwitter.API.Options;
 using SampleTwitter.API.Results;
 
 namespace SampleTwitter.API.Services;
@@ -12,17 +13,17 @@ public class EmailConfirmationService : IEmailConfirmationService
     private readonly ApplicationContext _applicationContext;
     private readonly ISecureTokenGenerator _tokenGenerator;
     private readonly IEmailSender _emailSender;
-    private readonly IConfiguration _configuration;
+    private readonly AppOptions _options;
     private readonly ILogger<EmailConfirmationService> _logger;
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(24);
 
     public EmailConfirmationService(ApplicationContext applicationContext, ISecureTokenGenerator tokenGenerator,
-        IEmailSender emailSender, IConfiguration configuration, ILogger<EmailConfirmationService> logger)
+        IEmailSender emailSender, AppOptions options, ILogger<EmailConfirmationService> logger)
     {
         _applicationContext = applicationContext;
         _tokenGenerator = tokenGenerator;
         _emailSender = emailSender;
-        _configuration = configuration;
+        _options = options;
         _logger = logger;
     }
 
@@ -56,7 +57,7 @@ public class EmailConfirmationService : IEmailConfirmationService
         _applicationContext.EmailConfirmationTokens.Add(tokenEntity);
         await _applicationContext.SaveChangesAsync(ct);
 
-        var baseUrl = _configuration["AppSettings:BaseUrl"];
+        var baseUrl = _options.BaseUrl;
         var confirmationLink =
             $"{baseUrl}/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}";
 
