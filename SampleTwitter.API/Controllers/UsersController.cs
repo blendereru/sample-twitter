@@ -1,3 +1,4 @@
+using Mapster;
 using Microsoft.AspNetCore.Mvc;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.DTOs.ResponseDTOs;
@@ -35,6 +36,24 @@ public class UsersController : ControllerBase
     {
         var feed = await _postService.GetPosts(userId, ct);
         return Ok(new PostFeedResponse(feed.Items, feed.Author));
+    }
+
+    /// <summary>
+    /// Returns the profile replies feed for the given user.
+    /// </summary>
+    /// <param name="userId">The id of the user whose feed to retrieve.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Feed returned successfully.</response>
+    /// <response code="404">User is not found (an account was deleted or invalid userId)</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpGet("{userId:long}/replies")]
+    [ProducesResponseType(typeof(ReplyFeedResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetProfileReplies(long userId, CancellationToken ct)
+    {
+        var feed = await _postService.GetReplies(userId, ct);
+        return Ok(feed.Adapt<ReplyFeedResponse>());
     }
 
     /// <summary>

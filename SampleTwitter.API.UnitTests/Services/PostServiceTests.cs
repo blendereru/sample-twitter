@@ -377,6 +377,26 @@ public class PostServiceTests : IDisposable
         await Assert.ThrowsAsync<PostNotFoundException>(() => _sut.GetById(id: 99999));
     }
 
+    [Fact]
+    public async Task GetReplies_NonExistentUser_ThrowsUserNotFoundException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<UserNotFoundException>(() => _sut.GetReplies(userId: 99999));
+    }
+
+    [Fact]
+    public async Task GetReplies_UserHasNoPosts_ReturnsEmptyList()
+    {
+        // Arrange
+        var user = await SeedUser(userId: 1, "user@email.com");
+
+        // Act
+        var posts = await _sut.GetReplies(userId: user.Id);
+
+        // Assert
+        Assert.Empty(posts.Items);
+    }
+
     private async Task<Repost> SeedRepost(long postId, long userId, DateTimeOffset? createdAt = null)
     {
         await SeedUser(userId, $"user{userId}@example.com");

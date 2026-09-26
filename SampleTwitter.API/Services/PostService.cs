@@ -238,4 +238,43 @@ public class PostService : IPostService
 
         return post;
     }
+
+    public async Task<ProfileReplyFeedResult> GetReplies(long userId, CancellationToken ct = default)
+    {
+        var user = await _applicationContext.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(u => u.Id == userId, ct);
+
+        if(user is null)
+        {
+            _logger.LogWarning("Replies feed requested for non-existent user {UserId}", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        var repliesFeed = await _applicationContext.Posts
+            .Where(p => p.UserId == userId && p.ReplyId != null)
+            .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new ReplyPostResult(
+                p.Id,
+                p.Text,
+                p.ImageUrl,
+                p.CreatedAt,
+                p.UpdatedAt,
+                new PostResult(
+                    p.Reply!.Id,
+                    p.Reply.Text,
+                    p.Reply.ImageUrl,
+                    p.Reply.CreatedAt,
+                    p.Reply.UpdatedAt,
+                    new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email),
+                    ReplyId: null,
+                    p.Reply.Reposts.Count,
+                    p.Reply.Replies.Count),
+                p.Reposts.Count,
+                p.Replies.Count))
+            .ToListAsync(ct);
+
+        return new ProfileReplyFeedResult(repliesFeed, new PostAuthorResult(user.Id, user.Email));
+    }
 }

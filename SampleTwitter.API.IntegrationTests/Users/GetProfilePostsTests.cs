@@ -10,9 +10,9 @@ using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.IntegrationTests.Users;
 
-public class GetPostsTests : IntegrationTestBase
+public class GetProfilePostsTests : IntegrationTestBase
 {
-    public GetPostsTests(ApiWebApplicationFactory factory) : base(factory) { }
+    public GetProfilePostsTests(ApiWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
     public async Task Unauthenticated_Returns200()
