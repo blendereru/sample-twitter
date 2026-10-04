@@ -11,20 +11,9 @@ using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.IntegrationTests.Posts;
 
-public class RepostTests : IntegrationTestBase, IDisposable
+public class RepostTests : IntegrationTestBase
 {
-    private readonly HttpClient _client;
-
-    public RepostTests(ApiWebApplicationFactory factory) : base(factory)
-    {
-        _client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false,
-            AllowAutoRedirect = false
-        });
-    }
-
-    public void Dispose() => _client.Dispose();
+    public RepostTests(ApiWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
     public async Task ValidRepost_Returns200WithRepostResponse()
@@ -192,7 +181,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         var post = await SeedPost(userId: author.Id, text: "public post");
 
         // Act (no auth cookie)
-        var response = await _client.PostAsync($"/api/posts/{post.Id}/repost", null);
+        var response = await Client.PostAsync($"/api/posts/{post.Id}/repost", null);
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -206,7 +195,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         var post = await SeedPost(userId: author.Id, text: "public post");
 
         // Act
-        await _client.PostAsync($"/api/posts/{post.Id}/repost", null);
+        await Client.PostAsync($"/api/posts/{post.Id}/repost", null);
 
         // Assert
         using var scope = Factory.Services.CreateScope();
@@ -236,7 +225,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         var post = await SeedPost(userId: author.Id, text: "post soon deleted");
 
         // Author deletes post
-        var deleteResponse = await _client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{post.Id}")
+        var deleteResponse = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{post.Id}")
         {
             Headers = { { "Cookie", authorCookie } }
         });
@@ -262,68 +251,12 @@ public class RepostTests : IntegrationTestBase, IDisposable
         {
             Headers = { { "Cookie", cookie } }
         };
-        var response = await _client.SendAsync(message);
+        var response = await Client.SendAsync(message);
 
         // Assert
         Assert.True(
             response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.NotFound,
             $"Expected 400 or 404, but got {response.StatusCode}");
-    }
-
-    private async Task<User> SeedUser(string email, string password)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-
-        var user = new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = true,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-        return user;
-    }
-
-    private async Task<(User User, string Cookie)> SeedAndSignIn(string email, string password)
-    {
-        var user = await SeedUser(email, password);
-
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/signin",
-            new LoginRequest { Email = email, Password = password });
-
-        loginResponse.EnsureSuccessStatusCode();
-
-        var setCookieHeader = loginResponse.Headers.GetValues("Set-Cookie")
-            .First(v => v.StartsWith("SampleTwitter.Auth="));
-        var cookie = setCookieHeader.Split(';')[0];
-
-        return (user, cookie);
-    }
-
-    private async Task<Post> SeedPost(
-        long userId,
-        string? text = null,
-        string? imageUrl = null,
-        long? replyId = null)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-
-        var post = new Post
-        {
-            Text = text,
-            ImageUrl = imageUrl,
-            ReplyId = replyId,
-            UserId = userId,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
-        return post;
     }
 
     private Task<HttpResponseMessage> SendRepostRequest(string cookie, long postId)
@@ -332,7 +265,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         {
             Headers = { { "Cookie", cookie } }
         };
-        return _client.SendAsync(message);
+        return Client.SendAsync(message);
     }
 
     private Task<HttpResponseMessage> SendUndoRepostRequest(string? cookie, long postId)
@@ -342,7 +275,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         {
             message.Headers.Add("Cookie", cookie);
         }
-        return _client.SendAsync(message);
+        return Client.SendAsync(message);
     }
 
     [Fact]
@@ -443,7 +376,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         await SendRepostRequest(reposterCookie, post.Id);
 
         // Soft delete original post
-        var deleteResp = await _client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{post.Id}")
+        var deleteResp = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{post.Id}")
         {
             Headers = { { "Cookie", authorCookie } }
         });
@@ -466,7 +399,7 @@ public class RepostTests : IntegrationTestBase, IDisposable
         {
             Headers = { { "Cookie", cookie } }
         };
-        var response = await _client.SendAsync(message);
+        var response = await Client.SendAsync(message);
 
         // Assert
         Assert.True(

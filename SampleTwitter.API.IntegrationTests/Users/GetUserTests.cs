@@ -293,38 +293,4 @@ public class GetUserTests : IntegrationTestBase
         Assert.NotNull(body);
         Assert.Equal(email, body.Email);
     }
-
-    private async Task<User> SeedUser(string email, string password, bool emailConfirmed = true)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-
-        var user = new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = emailConfirmed,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-        return user;
-    }
-
-    private async Task<(User User, string Cookie)> SeedAndSignIn(string email, string password)
-    {
-        var user = await SeedUser(email, password);
-
-        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
-            new LoginRequest { Email = email, Password = password });
-
-        loginResponse.EnsureSuccessStatusCode();
-
-        var setCookieHeader = loginResponse.Headers.GetValues("Set-Cookie")
-            .First(v => v.StartsWith("SampleTwitter.Auth="));
-        var cookie = setCookieHeader.Split(';')[0];
-
-        return (user, cookie);
-    }
 }

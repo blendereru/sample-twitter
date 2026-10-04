@@ -8,7 +8,7 @@ namespace SampleTwitter.API.ArchitectureTests;
 public class TestsConventionTests
 {
     private static readonly System.Reflection.Assembly UnitTestsAssembly =
-        typeof(SampleTwitter.API.UnitTests.Services.PostServiceTests).Assembly;
+        typeof(SampleTwitter.API.UnitTests.Services.SecureTokenGeneratorTests).Assembly;
 
     private static readonly Architecture Architecture = new ArchLoader()
         .LoadAssemblies(

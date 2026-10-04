@@ -427,62 +427,6 @@ public class CreatePostTests : IntegrationTestBase
         await response.AssertValidationProblemDetails("ImageUrl");
     }
 
-    private async Task<User> SeedUser(string email, string password)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-
-        var user = new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = true,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
-        return user;
-    }
-
-    private async Task<(User User, string Cookie)> SeedAndSignIn(string email, string password)
-    {
-        var user = await SeedUser(email, password);
-
-        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
-            new LoginRequest { Email = email, Password = password });
-
-        loginResponse.EnsureSuccessStatusCode();
-
-        var setCookieHeader = loginResponse.Headers.GetValues("Set-Cookie")
-            .First(v => v.StartsWith("SampleTwitter.Auth="));
-        var cookie = setCookieHeader.Split(';')[0];
-
-        return (user, cookie);
-    }
-
-    private async Task<Post> SeedPost(
-        long userId,
-        string? text = null,
-        string? imageUrl = null,
-        long? replyId = null)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-
-        var post = new Post
-        {
-            Text = text,
-            ImageUrl = imageUrl,
-            ReplyId = replyId,
-            UserId = userId,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        db.Posts.Add(post);
-        await db.SaveChangesAsync();
-        return post;
-    }
-
     private Task<HttpResponseMessage> SendCreateRequest(string cookie, CreatePostRequest request)
     {
         var message = new HttpRequestMessage(HttpMethod.Post, "/api/posts")

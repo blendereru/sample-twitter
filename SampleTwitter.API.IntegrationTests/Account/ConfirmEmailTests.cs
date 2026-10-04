@@ -1,10 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
@@ -15,15 +13,7 @@ namespace SampleTwitter.API.IntegrationTests.Account;
 
 public class ConfirmEmailTests : IntegrationTestBase
 {
-    private readonly HttpClient _rawClient;
-
-    public ConfirmEmailTests(ApiWebApplicationFactory factory) : base(factory)
-    {
-        _rawClient = factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false
-        });
-    }
+    public ConfirmEmailTests(ApiWebApplicationFactory factory) : base(factory) { }
     
     [Fact]
     public async Task ValidToken_Returns200AndSignsInAndMarksTokenUsed()
@@ -32,7 +22,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, rawToken) = await SeedUserWithValidToken("user@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
@@ -65,7 +55,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, _) = await SeedUserWithValidToken("user@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token=completely-wrong-token",
             content: null);
 
@@ -80,7 +70,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, rawToken) = await SeedUserWithValidToken("user@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId + 999}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
@@ -95,7 +85,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, rawToken) = await SeedUserWithUsedToken("user@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
@@ -110,7 +100,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, rawToken) = await SeedUserWithExpiredToken("user@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
@@ -126,13 +116,13 @@ public class ConfirmEmailTests : IntegrationTestBase
         var url = $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}";
 
         // Act — first call
-        var firstResponse = await _rawClient.PostAsync(url, content: null);
+        var firstResponse = await Client.PostAsync(url, content: null);
 
         // Assert — first call succeeds
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
 
         // Act — second call with the same token
-        var secondResponse = await _rawClient.PostAsync(url, content: null);
+        var secondResponse = await Client.PostAsync(url, content: null);
 
         // Assert — second call is rejected because UsedAt is now set
         await secondResponse.AssertProblemDetails(HttpStatusCode.BadRequest);
@@ -146,7 +136,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userBId, rawTokenB) = await SeedUserWithValidToken("userb@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userAId}&token={Uri.EscapeDataString(rawTokenB)}",
             content: null);
 
@@ -172,7 +162,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, _) = await SeedUserWithValidToken("pending@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token=invalid-token",
             content: null);
 
@@ -199,7 +189,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, rawToken) = await SeedUserWithValidToken("confirmed@example.com");
 
         // Act
-        var confirmResponse = await _rawClient.PostAsync(
+        var confirmResponse = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token={Uri.EscapeDataString(rawToken)}",
             content: null);
 
@@ -213,7 +203,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         {
             Headers = { { "Cookie", authCookie } }
         };
-        var meResponse = await _rawClient.SendAsync(meRequest);
+        var meResponse = await Client.SendAsync(meRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
@@ -230,7 +220,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         var (userId, _) = await SeedUserWithValidToken("user@example.com");
 
         // Act
-        var response = await _rawClient.PostAsync(
+        var response = await Client.PostAsync(
             $"/api/auth/confirm-email?userId={userId}&token=",
             content: null);
 
@@ -256,13 +246,13 @@ public class ConfirmEmailTests : IntegrationTestBase
         var secondConfirmUrl = ExtractConfirmationUrl(secondEmail.HtmlBody);
 
         // Act
-        var firstResponse = await _rawClient.PostAsync(firstConfirmUrl, content: null);
+        var firstResponse = await Client.PostAsync(firstConfirmUrl, content: null);
 
         // Assert
         await firstResponse.AssertProblemDetails(HttpStatusCode.BadRequest);
 
         // Act
-        var secondResponse = await _rawClient.PostAsync(secondConfirmUrl, content: null);
+        var secondResponse = await Client.PostAsync(secondConfirmUrl, content: null);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
@@ -376,10 +366,11 @@ public class ConfirmEmailTests : IntegrationTestBase
             .SingleOrDefaultAsync(t => t.UserId == userId);
     }
     
-    private static string ComputeTokenHash(string rawToken)
+    private string ComputeTokenHash(string rawToken)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
-        return Convert.ToHexString(bytes);
+        using var scope = Factory.Services.CreateScope();
+        var tokenGenerator = scope.ServiceProvider.GetRequiredService<ISecureTokenGenerator>();
+        return tokenGenerator.Hash(rawToken);
     }
 
     private static string ExtractConfirmationUrl(string htmlBody)

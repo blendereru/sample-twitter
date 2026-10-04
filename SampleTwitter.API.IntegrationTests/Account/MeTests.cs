@@ -178,21 +178,8 @@ public class MeTests : IntegrationTestBase
         await response.AssertProblemDetails(HttpStatusCode.NotFound);
     }
 
-    private async Task SeedConfirmedUser(string email, string password)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-
-        db.Users.Add(new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = true,
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
-        await db.SaveChangesAsync();
-    }
+    private Task<User> SeedConfirmedUser(string email, string password) =>
+        SeedUser(email, password, emailConfirmed: true);
 
     private static string ExtractConfirmationUrl(string htmlBody)
     {

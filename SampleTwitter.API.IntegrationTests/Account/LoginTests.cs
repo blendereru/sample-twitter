@@ -1,9 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using SampleTwitter.API.Abstractions;
-using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.IntegrationTests.Infrastructure;
@@ -13,15 +9,7 @@ namespace SampleTwitter.API.IntegrationTests.Account;
 
 public class LoginTests : IntegrationTestBase
 {
-    private readonly HttpClient _rawClient;
-
-    public LoginTests(ApiWebApplicationFactory factory) : base(factory)
-    {
-        _rawClient = factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            HandleCookies = false
-        });
-    }
+    public LoginTests(ApiWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
     public async Task ValidCredentials_Returns200WithLoginResponseAndIssuesAuthCookie()
@@ -30,7 +18,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "Sup3rSecret1!");
 
         // Act
-        var response = await _rawClient.PostAsJsonAsync("/api/auth/signin",
+        var response = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = "Sup3rSecret1!" });
 
         // Assert — HTTP contract
@@ -61,8 +49,6 @@ public class LoginTests : IntegrationTestBase
     public async Task InvalidRequest_Returns400WithValidationProblemDetailsNamingTheOffendingField(
         object requestBody, string expectedInvalidField)
     {
-        // Arrange - requestBody provided by MemberData
-
         // Act
         var response = await Client.PostAsJsonAsync("/api/auth/signin", requestBody);
 
@@ -141,8 +127,7 @@ public class LoginTests : IntegrationTestBase
         var response = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = "WrongPassword1!" });
 
-        // Assert — the public detail should be the same generic message for wrong password
-        // and non-existent user, preventing user enumeration
+        // Assert — generic message preventing user enumeration
         var wrongPwDetails = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
 
         var nonExistentResponse = await Client.PostAsJsonAsync("/api/auth/signin",
@@ -159,7 +144,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "CorrectPassword1!");
 
         // Act
-        var response = await _rawClient.PostAsJsonAsync("/api/auth/signin",
+        var response = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = "WrongPassword1!" });
 
         // Assert
@@ -176,7 +161,7 @@ public class LoginTests : IntegrationTestBase
         await SeedUnconfirmedUser("pending@example.com", "Sup3rSecret1!");
 
         // Act
-        var response = await _rawClient.PostAsJsonAsync("/api/auth/signin",
+        var response = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "pending@example.com", Password = "Sup3rSecret1!" });
 
         // Assert
@@ -193,7 +178,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "Sup3rSecret1!");
 
         // Act
-        var response = await _rawClient.PostAsJsonAsync("/api/auth/signin",
+        var response = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = "Sup3rSecret1!" });
 
         // Assert
@@ -212,7 +197,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", "Sup3rSecret1!");
 
         // Act
-        var loginResponse = await _rawClient.PostAsJsonAsync("/api/auth/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = "Sup3rSecret1!" });
 
         // Assert
@@ -225,7 +210,7 @@ public class LoginTests : IntegrationTestBase
         {
             Headers = { { "Cookie", authCookie } }
         };
-        var meResponse = await _rawClient.SendAsync(meRequest);
+        var meResponse = await Client.SendAsync(meRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
@@ -242,7 +227,7 @@ public class LoginTests : IntegrationTestBase
         await SeedConfirmedUser("bob@example.com", "PasswordBob1!");
 
         // Act
-        var response = await _rawClient.PostAsJsonAsync("/api/auth/signin",
+        var response = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "bob@example.com", Password = "PasswordBob1!" });
 
         // Assert
@@ -253,35 +238,9 @@ public class LoginTests : IntegrationTestBase
         Assert.Equal("bob@example.com", body.Email);
     }
 
-    private async Task SeedConfirmedUser(string email, string password)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+    private Task<User> SeedConfirmedUser(string email, string password) =>
+        SeedUser(email, password, emailConfirmed: true);
 
-        db.Users.Add(new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = true,
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
-        await db.SaveChangesAsync();
-    }
-
-    private async Task SeedUnconfirmedUser(string email, string password)
-    {
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-
-        db.Users.Add(new User
-        {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = false,
-            RegisteredAt = DateTimeOffset.UtcNow
-        });
-        await db.SaveChangesAsync();
-    }
+    private Task<User> SeedUnconfirmedUser(string email, string password) =>
+        SeedUser(email, password, emailConfirmed: false);
 }

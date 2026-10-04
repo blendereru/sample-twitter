@@ -229,6 +229,27 @@ public class SignUpTests : IntegrationTestBase
         Assert.Null(user);
     }
 
+    [Fact]
+    public async Task ConcurrentRegistrations_WithSameEmail_HandlesPostgresUniqueConstraintRaceCondition()
+    {
+        // Arrange
+        var request = new SignUpRequest { Email = "race_condition@example.com", Password = "Sup3rSecret1!" };
+
+        // Act — dispatch concurrent registration requests for the exact same email
+        var task1 = Client.PostAsJsonAsync("/api/auth/signup", request);
+        var task2 = Client.PostAsJsonAsync("/api/auth/signup", request);
+
+        var responses = await Task.WhenAll(task1, task2);
+
+        // Assert — one must succeed (201 Created) and the other must hit the unique violation catch block (409 Conflict)
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Created);
+        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+
+        // Verify database integrity — exactly one user was persisted
+        var users = await QueryAllUsersAsync("race_condition@example.com");
+        Assert.Single(users);
+    }
+
     private async Task SeedConfirmedUser(string email, string passwordHash)
     {
         using var scope = Factory.Services.CreateScope();
