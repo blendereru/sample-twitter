@@ -78,6 +78,34 @@ export interface PostFeedResponse {
   author: PostAuthorDto;
 }
 
+export interface PostResponse {
+  id: number;
+  text?: string;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt?: string;
+  author: PostAuthorDto;
+  replyId?: number | null;
+  repostCount: number;
+  replyCount: number;
+}
+
+export interface ReplyFeedItemDto {
+  id: number;
+  text?: string;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt?: string;
+  parentPost?: PostResponse | null;
+  repostCount: number;
+  replyCount: number;
+}
+
+export interface ReplyFeedResponse {
+  items: ReplyFeedItemDto[];
+  author: PostAuthorDto;
+}
+
 
 export interface ProblemDetails {
   type?: string;

@@ -3,10 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
-import { getUserPosts } from '@/api/users';
+import { getUserPosts, getUserReplies } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostFeedItemDto, PostAuthorDto, RepostResponse } from '@/types/api';
+import type { PostFeedItemDto, ReplyFeedItemDto, PostAuthorDto, RepostResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -28,6 +28,9 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const isNotFound = ref(false);
 const posts = ref<PostFeedItemDto[]>([]);
+const replies = ref<ReplyFeedItemDto[]>([]);
+const postsLoaded = ref(false);
+const repliesLoaded = ref(false);
 const profileAuthor = ref<PostAuthorDto | null>(null);
 const activeTab = ref<'posts' | 'replies' | 'highlights' | 'media' | 'likes'>('posts');
 
@@ -52,7 +55,19 @@ const joinedText = computed(() => {
   if (posts.value.length > 0) {
     return formatJoinedDate(posts.value[posts.value.length - 1].createdAt);
   }
+  if (replies.value.length > 0) {
+    return formatJoinedDate(replies.value[replies.value.length - 1].createdAt);
+  }
   return null;
+});
+
+const headerCountText = computed(() => {
+  if (activeTab.value === 'replies') {
+    const count = replies.value.length;
+    return `${count} ${count === 1 ? 'reply' : 'replies'}`;
+  }
+  const count = posts.value.length;
+  return `${count} ${count === 1 ? 'post' : 'posts'}`;
 });
 
 function formatJoinedDate(dateStr?: string | null): string {
@@ -89,7 +104,7 @@ function getAvatar(userId: number): string {
     : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80';
 }
 
-async function fetchFeed(options: { silent?: boolean } = {}) {
+async function fetchFeed(tab: 'posts' | 'replies' = activeTab.value === 'replies' ? 'replies' : 'posts', options: { silent?: boolean } = {}) {
   if (!targetUserId.value || isNaN(targetUserId.value)) {
     error.value = 'Invalid user ID.';
     loading.value = false;
@@ -103,21 +118,42 @@ async function fetchFeed(options: { silent?: boolean } = {}) {
   isNotFound.value = false;
 
   try {
-    const response = await getUserPosts(targetUserId.value);
-    posts.value = response.items || [];
-    profileAuthor.value = response.author || null;
+    if (tab === 'replies') {
+      const response = await getUserReplies(targetUserId.value);
+      replies.value = response.items || [];
+      repliesLoaded.value = true;
+      if (!profileAuthor.value) {
+        profileAuthor.value = response.author || null;
+      }
+    } else {
+      const response = await getUserPosts(targetUserId.value);
+      posts.value = response.items || [];
+      postsLoaded.value = true;
+      if (!profileAuthor.value) {
+        profileAuthor.value = response.author || null;
+      }
+    }
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     if (parsed.status === 404) {
       isNotFound.value = true;
       error.value = 'This account does not exist.';
     } else {
-      error.value = parsed.detail || parsed.message || 'Failed to load posts.';
+      error.value = parsed.detail || parsed.message || `Failed to load ${tab}.`;
     }
   } finally {
     if (!options.silent) {
       loading.value = false;
     }
+  }
+}
+
+function switchTab(tab: 'posts' | 'replies' | 'highlights' | 'media' | 'likes') {
+  activeTab.value = tab;
+  if (tab === 'posts' && !postsLoaded.value) {
+    fetchFeed('posts');
+  } else if (tab === 'replies' && !repliesLoaded.value) {
+    fetchFeed('replies');
   }
 }
 
@@ -136,12 +172,30 @@ function handlePostDeleted(id: number) {
   posts.value = posts.value.filter(p => p.id !== id);
 }
 
+function handleReplyUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
+  const item = replies.value.find(r => r.id === updated.id);
+  if (item) {
+    item.text = updated.text;
+    item.imageUrl = updated.imageUrl;
+    item.updatedAt = updated.updatedAt || new Date().toISOString();
+  }
+}
+
+function handleReplyDeleted(id: number) {
+  replies.value = replies.value.filter(r => r.id !== id);
+}
+
 function handlePostReposted(response: RepostResponse) {
   myRepostedPostIds.value.add(response.postId);
 
   for (const p of posts.value) {
     if (p.id === response.postId) {
       p.repostCount = (p.repostCount || 0) + 1;
+    }
+  }
+  for (const r of replies.value) {
+    if (r.id === response.postId) {
+      r.repostCount = (r.repostCount || 0) + 1;
     }
   }
 }
@@ -152,6 +206,11 @@ function handlePostUndoReposted(postId: number) {
   for (const p of posts.value) {
     if (p.id === postId) {
       p.repostCount = Math.max(0, (p.repostCount || 0) - 1);
+    }
+  }
+  for (const r of replies.value) {
+    if (r.id === postId) {
+      r.repostCount = Math.max(0, (r.repostCount || 0) - 1);
     }
   }
 }
@@ -165,13 +224,17 @@ function goBack() {
 }
 
 onMounted(() => {
-  fetchFeed();
+  fetchFeed('posts');
 });
 
 watch(
   () => route.params.id,
   () => {
-    fetchFeed();
+    postsLoaded.value = false;
+    repliesLoaded.value = false;
+    posts.value = [];
+    replies.value = [];
+    fetchFeed(activeTab.value === 'replies' ? 'replies' : 'posts');
   }
 );
 </script>
@@ -193,7 +256,7 @@ watch(
           {{ isNotFound ? 'Profile' : profileDisplayName }}
         </h2>
         <span v-if="!loading && !isNotFound" class="text-xs text-neutral-500">
-          {{ posts.length }} {{ posts.length === 1 ? 'post' : 'posts' }}
+          {{ headerCountText }}
         </span>
       </div>
     </div>
@@ -280,9 +343,9 @@ watch(
         <!-- Profile Tabs -->
         <div class="flex border-b border-neutral-800 text-sm font-bold select-none overflow-x-auto">
           <button
-            @click="activeTab = 'posts'"
+            @click="switchTab('posts')"
             :class="[
-              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative',
+              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
               activeTab === 'posts' ? 'text-white font-bold' : 'text-neutral-500'
             ]"
           >
@@ -294,9 +357,9 @@ watch(
           </button>
 
           <button
-            @click="activeTab = 'replies'"
+            @click="switchTab('replies')"
             :class="[
-              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative',
+              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
               activeTab === 'replies' ? 'text-white font-bold' : 'text-neutral-500'
             ]"
           >
@@ -308,9 +371,9 @@ watch(
           </button>
 
           <button
-            @click="activeTab = 'highlights'"
+            @click="switchTab('highlights')"
             :class="[
-              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative',
+              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
               activeTab === 'highlights' ? 'text-white font-bold' : 'text-neutral-500'
             ]"
           >
@@ -322,9 +385,9 @@ watch(
           </button>
 
           <button
-            @click="activeTab = 'media'"
+            @click="switchTab('media')"
             :class="[
-              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative',
+              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
               activeTab === 'media' ? 'text-white font-bold' : 'text-neutral-500'
             ]"
           >
@@ -336,9 +399,9 @@ watch(
           </button>
 
           <button
-            @click="activeTab = 'likes'"
+            @click="switchTab('likes')"
             :class="[
-              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative',
+              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
               activeTab === 'likes' ? 'text-white font-bold' : 'text-neutral-500'
             ]"
           >
@@ -359,16 +422,16 @@ watch(
       <div v-else-if="error" class="p-6 text-center">
         <p class="text-sm text-red-400 mb-3">{{ error }}</p>
         <button
-          @click="() => fetchFeed()"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-700 hover:bg-neutral-800 text-xs font-semibold text-neutral-300 transition-colors"
+          @click="() => fetchFeed(activeTab === 'replies' ? 'replies' : 'posts')"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-700 hover:bg-neutral-800 text-xs font-semibold text-neutral-300 transition-colors cursor-pointer"
         >
           <RefreshCw class="w-3.5 h-3.5" />
           <span>Retry</span>
         </button>
       </div>
 
-      <!-- Non-Posts Tab Empty State -->
-      <div v-else-if="activeTab !== 'posts'" class="flex flex-col items-center justify-center p-12 text-center">
+      <!-- Non-Posts / Non-Replies Tab Empty State -->
+      <div v-else-if="activeTab !== 'posts' && activeTab !== 'replies'" class="flex flex-col items-center justify-center p-12 text-center">
         <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
           <MessageSquare class="w-8 h-8 text-neutral-600" />
         </div>
@@ -378,8 +441,8 @@ watch(
         </p>
       </div>
 
-      <!-- Empty State -->
-      <div v-else-if="posts.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
+      <!-- Posts Tab Empty State -->
+      <div v-else-if="activeTab === 'posts' && posts.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
         <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
           <MessageSquare class="w-8 h-8 text-neutral-600" />
         </div>
@@ -390,13 +453,12 @@ watch(
       </div>
 
       <!-- Posts List -->
-      <div v-else class="flex flex-col">
+      <div v-else-if="activeTab === 'posts'" class="flex flex-col">
         <div
           v-for="post in posts"
           :key="post.id"
           class="flex flex-col border-b border-neutral-800"
         >
-          <!-- Main Post Card -->
           <TweetCard
             :id="post.id"
             :user-id="profileAuthor?.id ?? targetUserId"
@@ -417,6 +479,123 @@ watch(
             @undo-repost="handlePostUndoReposted"
             class="!border-b-0"
           />
+        </div>
+      </div>
+
+      <!-- Replies Tab -->
+      <div v-else-if="activeTab === 'replies'" class="flex flex-col">
+        <!-- Replies Tab Empty State -->
+        <div v-if="replies.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
+          <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
+            <MessageSquare class="w-8 h-8 text-neutral-600" />
+          </div>
+          <h3 class="text-xl font-bold mb-1">No replies yet</h3>
+          <p class="text-neutral-500 text-sm max-w-xs">
+            {{ isMyProfile ? "When you reply, your replies will show up here." : "When this user replies, their replies will show up here." }}
+          </p>
+        </div>
+
+        <!-- Replies List with Parent Post thread context -->
+        <div v-else class="flex flex-col">
+          <div
+            v-for="reply in replies"
+            :key="reply.id"
+            class="flex flex-col border-b border-neutral-800"
+          >
+            <!-- Parent Post Context -->
+            <div v-if="reply.parentPost" class="px-4 pt-3 pb-1 flex gap-3 relative">
+              <!-- Avatar & vertical thread line to reply -->
+              <div class="flex flex-col items-center">
+                <img
+                  v-if="reply.parentPost.author"
+                  :src="getAvatar(reply.parentPost.author.id)"
+                  class="w-10 h-10 rounded-full object-cover shrink-0 bg-neutral-800"
+                  alt="Parent Author Avatar"
+                />
+                <div
+                  v-else
+                  class="w-10 h-10 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0 text-neutral-400 text-xs font-bold"
+                >
+                  #{{ reply.parentPost.id }}
+                </div>
+                <div class="w-0.5 bg-neutral-700/80 grow mt-1.5 -mb-2"></div>
+              </div>
+
+              <!-- Parent Post Body -->
+              <div class="flex flex-col gap-1 w-full pb-2">
+                <div class="flex items-center gap-1.5 text-xs text-neutral-500 flex-wrap">
+                  <template v-if="reply.parentPost.author">
+                    <span class="font-bold text-white hover:underline">
+                      {{ reply.parentPost.author.email.split('@')[0] }}
+                    </span>
+                    <span class="text-neutral-500">
+                      @{{ reply.parentPost.author.email }}
+                    </span>
+                  </template>
+                  <span v-else class="font-bold text-neutral-300">
+                    Post #{{ reply.parentPost.id }}
+                  </span>
+                  <span class="text-neutral-600">·</span>
+                  <span class="text-neutral-500">{{ formatDate(reply.parentPost.createdAt) }}</span>
+                </div>
+
+                <p v-if="reply.parentPost.text" class="text-sm leading-relaxed text-neutral-300 whitespace-pre-line">
+                  {{ reply.parentPost.text }}
+                </p>
+
+                <div v-if="reply.parentPost.imageUrl" class="mt-2 rounded-2xl overflow-hidden border border-neutral-800 max-h-60 max-w-md">
+                  <img :src="reply.parentPost.imageUrl" alt="Parent post image" class="w-full h-full object-cover" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Soft-deleted Parent Post Indicator (Option B) -->
+            <div v-else-if="reply.parentPost === null" class="px-4 pt-3 pb-1 flex gap-3 relative">
+              <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center shrink-0 text-neutral-500">
+                  <AlertCircle class="w-4 h-4" />
+                </div>
+                <div class="w-0.5 bg-neutral-800 grow mt-1.5 -mb-2"></div>
+              </div>
+
+              <div class="flex flex-col gap-1 w-full pb-2 justify-center">
+                <span class="text-xs text-neutral-500 italic bg-neutral-900/60 border border-neutral-800/80 rounded-xl px-3 py-2 w-fit">
+                  This post was deleted.
+                </span>
+              </div>
+            </div>
+
+            <!-- Reply Card -->
+            <div class="relative">
+              <div class="text-xs text-neutral-500 px-4 pt-1.5 pb-0 flex items-center gap-1.5 ml-13">
+                <span>Replying to</span>
+                <span class="text-sky-500 font-medium hover:underline">
+                  {{ reply.parentPost?.author ? `@${reply.parentPost.author.email.split('@')[0]}` : reply.parentPost ? `Post #${reply.parentPost.id}` : 'a deleted post' }}
+                </span>
+              </div>
+
+              <TweetCard
+                :id="reply.id"
+                :user-id="profileAuthor?.id ?? targetUserId"
+                :author="profileDisplayName"
+                :handle="'@' + profileEmail"
+                :avatar="getAvatar(profileAuthor?.id ?? targetUserId)"
+                :content="reply.text || ''"
+                :image-url="reply.imageUrl"
+                :timestamp="formatDate(reply.createdAt)"
+                :updated-at="reply.updatedAt"
+                :retweets="reply.repostCount"
+                :replies="reply.replyCount"
+                :can-edit="isMyProfile"
+                :is-reposted="myRepostedPostIds.has(reply.id)"
+                @updated="handleReplyUpdated"
+                @delete="handleReplyDeleted"
+                @reposted="handlePostReposted"
+                @undo-repost="handlePostUndoReposted"
+                class="!border-b-0 !pt-2"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

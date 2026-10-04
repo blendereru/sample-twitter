@@ -354,6 +354,9 @@ public class GetProfileRepliesTests : IntegrationTestBase
         Assert.Equal(parentPost.ImageUrl, item.ParentPost.ImageUrl);
         Assert.Equal(parentTime.ToUnixTimeSeconds(), item.ParentPost.CreatedAt.ToUnixTimeSeconds());
         Assert.Null(item.ParentPost.UpdatedAt);
+        Assert.NotNull(item.ParentPost.Author);
+        Assert.Equal(parentAuthor.Id, item.ParentPost.Author.Id);
+        Assert.Equal(parentAuthor.Email, item.ParentPost.Author.Email);
     }
 
     [Fact]
