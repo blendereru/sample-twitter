@@ -261,16 +261,18 @@ public class PostService : IPostService
                 p.ImageUrl,
                 p.CreatedAt,
                 p.UpdatedAt,
-                new PostResult(
-                    p.Reply!.Id,
-                    p.Reply.Text,
-                    p.Reply.ImageUrl,
-                    p.Reply.CreatedAt,
-                    p.Reply.UpdatedAt,
-                    new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email),
-                    ReplyId: null,
-                    p.Reply.Reposts.Count,
-                    p.Reply.Replies.Count),
+                p.Reply == null
+                    ? null
+                    : new PostResult(
+                        p.Reply.Id,
+                        p.Reply.Text,
+                        p.Reply.ImageUrl,
+                        p.Reply.CreatedAt,
+                        p.Reply.UpdatedAt,
+                        new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email),
+                        ReplyId: null,
+                        p.Reply.Reposts.Count,
+                        p.Reply.Replies.Count),
                 p.Reposts.Count,
                 p.Replies.Count))
             .ToListAsync(ct);

@@ -17,6 +17,6 @@ public record ReplyFeedItemDto(
     string? ImageUrl,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
-    PostFeedItemDto ParentPost,
+    PostFeedItemDto? ParentPost,
     int RepostCount,
     int ReplyCount);

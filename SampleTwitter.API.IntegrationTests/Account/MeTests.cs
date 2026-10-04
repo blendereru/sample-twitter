@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
-using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
@@ -22,10 +21,16 @@ public class MeTests : IntegrationTestBase
         await SeedConfirmedUser("user@example.com", password);
 
         // Act
-        await Client.PostAsJsonAsync("/api/auth/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = password });
+        loginResponse.EnsureSuccessStatusCode();
+        var cookie = ExtractCookie(loginResponse);
 
-        var response = await Client.GetAsync("/api/auth/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
+        {
+            Headers = { { "Cookie", cookie } }
+        };
+        var response = await Client.SendAsync(request);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -77,8 +82,13 @@ public class MeTests : IntegrationTestBase
         var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = password });
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var cookie = ExtractCookie(loginResponse);
 
-        var meResponse = await Client.GetAsync("/api/auth/me");
+        var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
+        {
+            Headers = { { "Cookie", cookie } }
+        };
+        var meResponse = await Client.SendAsync(meRequest);
         var meBody = await meResponse.Content.ReadFromJsonAsync<MeResponse>();
 
         // Assert
@@ -101,8 +111,13 @@ public class MeTests : IntegrationTestBase
         // Act
         var confirmResponse = await Client.PostAsync(confirmUrl, content: null);
         Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
+        var cookie = ExtractCookie(confirmResponse);
 
-        var meResponse = await Client.GetAsync("/api/auth/me");
+        var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
+        {
+            Headers = { { "Cookie", cookie } }
+        };
+        var meResponse = await Client.SendAsync(meRequest);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
@@ -119,11 +134,16 @@ public class MeTests : IntegrationTestBase
         var password = "Sup3rSecret1!";
         await SeedConfirmedUser("user@example.com", password);
 
-        await Client.PostAsJsonAsync("/api/auth/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "user@example.com", Password = password });
+        var cookie = ExtractCookie(loginResponse);
 
         // Act
-        var response = await Client.GetAsync("/api/auth/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
+        {
+            Headers = { { "Cookie", cookie } }
+        };
+        var response = await Client.SendAsync(request);
         var rawJson = await response.Content.ReadAsStringAsync();
 
         // Assert
@@ -138,11 +158,16 @@ public class MeTests : IntegrationTestBase
         await SeedConfirmedUser("alice@example.com", "Sup3rSecret1!");
         await SeedConfirmedUser("bob@example.com", "Sup3rSecret1!");
 
-        await Client.PostAsJsonAsync("/api/auth/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = "bob@example.com", Password = "Sup3rSecret1!" });
+        var cookie = ExtractCookie(loginResponse);
 
         // Act
-        var response = await Client.GetAsync("/api/auth/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
+        {
+            Headers = { { "Cookie", cookie } }
+        };
+        var response = await Client.SendAsync(request);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -160,8 +185,9 @@ public class MeTests : IntegrationTestBase
         var email = "deleted-user@example.com";
         await SeedConfirmedUser(email, password);
 
-        await Client.PostAsJsonAsync("/api/auth/signin",
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = email, Password = password });
+        var cookie = ExtractCookie(loginResponse);
 
         using (var scope = Factory.Services.CreateScope())
         {
@@ -172,7 +198,11 @@ public class MeTests : IntegrationTestBase
         }
 
         // Act
-        var response = await Client.GetAsync("/api/auth/me");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")
+        {
+            Headers = { { "Cookie", cookie } }
+        };
+        var response = await Client.SendAsync(request);
 
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.NotFound);
@@ -180,6 +210,13 @@ public class MeTests : IntegrationTestBase
 
     private Task<User> SeedConfirmedUser(string email, string password) =>
         SeedUser(email, password, emailConfirmed: true);
+
+    private static string ExtractCookie(HttpResponseMessage response)
+    {
+        var setCookieHeader = response.Headers.GetValues("Set-Cookie")
+            .First(v => v.StartsWith("SampleTwitter.Auth="));
+        return setCookieHeader.Split(';')[0];
+    }
 
     private static string ExtractConfirmationUrl(string htmlBody)
     {

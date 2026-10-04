@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.Exceptions;
@@ -18,12 +19,12 @@ public class EmailConfirmationService : IEmailConfirmationService
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(24);
 
     public EmailConfirmationService(ApplicationContext applicationContext, ISecureTokenGenerator tokenGenerator,
-        IEmailSender emailSender, AppOptions options, ILogger<EmailConfirmationService> logger)
+        IEmailSender emailSender, IOptions<AppOptions> options, ILogger<EmailConfirmationService> logger)
     {
         _applicationContext = applicationContext;
         _tokenGenerator = tokenGenerator;
         _emailSender = emailSender;
-        _options = options;
+        _options = options.Value;
         _logger = logger;
     }
 

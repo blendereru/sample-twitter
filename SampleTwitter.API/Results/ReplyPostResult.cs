@@ -6,6 +6,6 @@ public record ReplyPostResult(
     string? ImageUrl,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
-    PostResult ParentPost,
+    PostResult? ParentPost,
     int RepostCount,
     int ReplyCount);
