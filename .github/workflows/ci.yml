@@ -64,6 +64,18 @@ jobs:
         run: dotnet build sample-twitter.slnx --no-restore --configuration Release
 
       # -----------------------------------------------------------------------
+      # 5.5. Architecture Tests (Fast-fail layer & convention validation)
+      # -----------------------------------------------------------------------
+      - name: Architecture Tests
+        run: >
+          dotnet test SampleTwitter.API.ArchitectureTests/SampleTwitter.API.ArchitectureTests.csproj
+          --no-build
+          --configuration Release
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=architecture-tests.trx"
+          --results-directory ./coverage
+
+      # -----------------------------------------------------------------------
       # 6. Unit Tests + coverage collection
       #
       # --collect:"XPlat Code Coverage" activates coverlet.collector, which
