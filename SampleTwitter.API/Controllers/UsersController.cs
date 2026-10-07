@@ -52,7 +52,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetProfileReplies(long userId, CancellationToken ct)
     {
-        var feed = await _postService.GetReplies(userId, ct);
+        var feed = await _postService.GetProfileReplies(userId, ct);
         return Ok(feed.Adapt<ReplyFeedResponse>());
     }
 

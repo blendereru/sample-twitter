@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { CreatePostRequest, CreatePostResponse, EditPostRequest, EditPostResponse, RepostResponse, PostFeedResponse } from '@/types/api';
+import type { CreatePostRequest, CreatePostResponse, EditPostRequest, EditPostResponse, RepostResponse, PostResponse } from '@/types/api';
 
 export async function createPost(request: CreatePostRequest): Promise<CreatePostResponse> {
   const response = await apiClient.post<CreatePostResponse>('/posts', request);
@@ -26,7 +26,7 @@ export async function undoRepost(id: number): Promise<void> {
 
 export const undoRepostPost = undoRepost;
 
-export async function getPostReplies(id: number): Promise<PostFeedResponse> {
-  const response = await apiClient.get<PostFeedResponse>(`/posts/${id}/replies`);
+export async function getPostReplies(id: number): Promise<PostResponse[]> {
+  const response = await apiClient.get<PostResponse[]>(`/posts/${id}/replies`);
   return response.data;
 }

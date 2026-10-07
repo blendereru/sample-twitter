@@ -191,4 +191,34 @@ public class PostController : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>
+    /// Retrieves all replies to a post by its ID.
+    /// </summary>
+    /// <param name="id">The ID of the post whose replies to retrieve.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The replies were retrieved successfully.</response>
+    /// <response code="404">No post exists with the given ID.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpGet("{id:long}/replies")]
+    [ProducesResponseType(typeof(List<PostResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReplies(long id, CancellationToken ct)
+    {
+        var results = await _postService.GetReplies(id, ct);
+
+        var response = results.Select(r => new PostResponse(
+            r.Id,
+            r.Text,
+            r.ImageUrl,
+            r.CreatedAt,
+            r.UpdatedAt,
+            new PostAuthorDto(r.Author.Id, r.Author.Email),
+            id,
+            r.RepostCount,
+            r.ReplyCount)).ToList();
+
+        return Ok(response);
+    }
 }

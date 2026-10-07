@@ -12,5 +12,6 @@ public interface IPostService
     Task<RepostResult> Repost(long postId, long userId, CancellationToken ct = default);
     Task UndoRepost(long postId, long userId, CancellationToken ct = default);
     Task<PostResult> GetById(long id, CancellationToken ct = default);
-    Task<ProfileReplyFeedResult> GetReplies(long userId, CancellationToken ct = default);
+    Task<ProfileReplyFeedResult> GetProfileReplies(long userId, CancellationToken ct = default);
+    Task<List<ReplyFeedResult>> GetReplies(long postId, CancellationToken ct = default);
 }
