@@ -23,6 +23,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
     public FakeEmailSender FakeEmailSender { get; } = new();
 
+    public UserInsertBarrierInterceptor UserInsertBarrier { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
@@ -59,6 +61,9 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         {
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(FakeEmailSender);
+
+            services.ConfigureDbContext<ApplicationContext>(options =>
+                options.AddInterceptors(UserInsertBarrier));
         });
     }
 

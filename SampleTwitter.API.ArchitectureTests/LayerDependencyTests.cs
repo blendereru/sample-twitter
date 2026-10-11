@@ -34,6 +34,9 @@ public class LayerDependencyTests
 
     private readonly IObjectProvider<IType> _dtoLayer =
         Types().That().ResideInNamespaceMatching(@"SampleTwitter\.API\.DTOs.*").As("DTOs");
+
+    private readonly IObjectProvider<IType> _responseDtoLayer =
+        Types().That().ResideInNamespace("SampleTwitter.API.DTOs.ResponseDTOs").As("Response DTOs");
     
     [Fact]
     public void Controllers_ShouldNotDependOn_ServiceImplementations()
@@ -64,6 +67,14 @@ public class LayerDependencyTests
     {
         Types().That().Are(_modelLayer)
             .Should().NotDependOnAny(_serviceLayer)
+            .Check(Architecture);
+    }
+
+    [Fact]
+    public void Services_ShouldNotDependOn_ResponseDTOs()
+    {
+        Types().That().Are(_serviceLayer)
+            .Should().NotDependOnAny(_responseDtoLayer)
             .Check(Architecture);
     }
 

@@ -85,6 +85,21 @@ public class LoginTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UnconfirmedUser_WrongPassword_Returns401WithProblemDetails()
+    {
+        // Arrange
+        await SeedUnconfirmedUser("pending@example.com", "CorrectPassword1!");
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/auth/signin",
+            new LoginRequest { Email = "pending@example.com", Password = "WrongPassword1!" });
+
+        // Assert
+        var problemDetails = await response.AssertProblemDetails(HttpStatusCode.Unauthorized);
+        Assert.DoesNotContain("pending@example.com", problemDetails.Detail ?? string.Empty);
+    }
+
+    [Fact]
     public async Task WrongPassword_Returns401WithProblemDetails()
     {
         // Arrange

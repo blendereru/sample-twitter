@@ -100,16 +100,16 @@ public class AccountService : IAccountService
             throw new InvalidCredentialsException($"No user found with email {normalizedEmail}.");
         }
 
-        if (!user.EmailConfirmed)
-        {
-            _logger.LogWarning("Login failed — email not confirmed for user {UserId}", user.Id);
-            throw new EmailNotConfirmedException($"User {user.Id} has not confirmed their email.");
-        }
-
         if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             _logger.LogWarning("Login failed — invalid password for user {UserId}", user.Id);
             throw new InvalidCredentialsException($"Invalid password for user {user.Id}.");
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            _logger.LogWarning("Login failed — email not confirmed for user {UserId}", user.Id);
+            throw new EmailNotConfirmedException($"User {user.Id} has not confirmed their email.");
         }
 
         _logger.LogInformation("User {UserId} authenticated successfully", user.Id);

@@ -35,7 +35,19 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetProfilePosts(long userId, CancellationToken ct)
     {
         var feed = await _postService.GetPosts(userId, ct);
-        return Ok(new PostFeedResponse(feed.Items, feed.Author));
+
+        var items = feed.Items
+            .Select(i => new PostFeedItemDto(
+                i.Id,
+                i.Text,
+                i.ImageUrl,
+                i.CreatedAt,
+                i.UpdatedAt,
+                i.RepostCount,
+                i.ReplyCount))
+            .ToList();
+
+        return Ok(new PostFeedResponse(items, new PostAuthorDto(feed.Author.Id, feed.Author.Email)));
     }
 
     /// <summary>

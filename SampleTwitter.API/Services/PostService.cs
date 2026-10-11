@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
-using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
 using SampleTwitter.API.Results;
@@ -115,7 +114,7 @@ public class PostService : IPostService
             .Where(p => p.UserId == user.Id && p.ReplyId == null)
             .OrderByDescending(p => p.CreatedAt)
             .ThenByDescending(p => p.Id)
-            .Select(p => new PostFeedItemDto(
+            .Select(p => new PostFeedItemResult(
                     p.Id,
                     p.Text,
                     p.ImageUrl,
@@ -125,7 +124,7 @@ public class PostService : IPostService
                     p.Replies.Count))
             .ToListAsync(ct);
 
-        return new ProfilePostFeedResult(posts, new PostAuthorDto(user.Id, user.Email));
+        return new ProfilePostFeedResult(posts, new PostAuthorResult(user.Id, user.Email));
     }
 
     public async Task Delete(long postId, long userId, CancellationToken ct = default)

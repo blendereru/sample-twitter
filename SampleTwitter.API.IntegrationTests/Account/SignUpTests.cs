@@ -13,7 +13,7 @@ namespace SampleTwitter.API.IntegrationTests.Account;
 public class SignUpTests : IntegrationTestBase
 {
     public SignUpTests(ApiWebApplicationFactory factory) : base(factory) { }
-    
+
 
     public static TheoryData<object, string> InvalidRequestCases => new()
     {
@@ -38,7 +38,7 @@ public class SignUpTests : IntegrationTestBase
         // Assert
         await response.AssertValidationProblemDetails(expectedInvalidField);
     }
-    
+
     [Fact]
     public async Task AlreadyConfirmedEmail_Returns409AndDoesNotModifyStateOrSendEmail()
     {
@@ -65,7 +65,7 @@ public class SignUpTests : IntegrationTestBase
         Assert.Equal("existing-hash", untouched.PasswordHash);
         Assert.True(untouched.EmailConfirmed);
     }
-    
+
     [Fact]
     public async Task UnconfirmedExistingEmail_Returns200AndUpdatesStateAndResendsEmail()
     {
@@ -94,7 +94,7 @@ public class SignUpTests : IntegrationTestBase
         Assert.NotEqual("old-hash", user.PasswordHash);
         Assert.False(user.EmailConfirmed);
     }
-    
+
     [Fact]
     public async Task NewEmail_Returns201AndPersistsUserAndSendsConfirmationEmail()
     {
@@ -122,7 +122,7 @@ public class SignUpTests : IntegrationTestBase
         Assert.False(user.EmailConfirmed);
         Assert.NotEqual("Sup3rSecret1!", user.PasswordHash);
     }
-    
+
     [Fact]
     public async Task NewEmail_WithLeadingTrailingWhitespaceAndMixedCase_IsNormalisedBeforeStoring()
     {
@@ -142,7 +142,7 @@ public class SignUpTests : IntegrationTestBase
         var original = await QueryUserAsync("  New@Example.com  ");
         Assert.Null(original);
     }
-    
+
     [Fact]
     public async Task SignUpForAlreadyConfirmedEmail_Returns409WithWellFormedProblemDetails()
     {
@@ -233,21 +233,37 @@ public class SignUpTests : IntegrationTestBase
     public async Task ConcurrentRegistrations_WithSameEmail_HandlesPostgresUniqueConstraintRaceCondition()
     {
         // Arrange
-        var request = new SignUpRequest { Email = "race_condition@example.com", Password = "Sup3rSecret1!" };
+        const string email = "race_condition@example.com";
+        var request = new SignUpRequest { Email = email, Password = "Sup3rSecret1!" };
+        using var barrier = Factory.UserInsertBarrier.Arm(participants: 2, timeout: TimeSpan.FromSeconds(10));
 
-        // Act — dispatch concurrent registration requests for the exact same email
-        var task1 = Client.PostAsJsonAsync("/api/auth/signup", request);
-        var task2 = Client.PostAsJsonAsync("/api/auth/signup", request);
+        // Act - dispatch concurrent registration requests for the exact same email
+        var responses = await Task.WhenAll(
+            Client.PostAsJsonAsync("/api/auth/signup", request),
+            Client.PostAsJsonAsync("/api/auth/signup", request));
 
-        var responses = await Task.WhenAll(task1, task2);
+        // Assert - the race was actually reproduced: both requests passed the existence check
+        // and attempted the INSERT simultaneously
+        Assert.Equal(2, barrier.ArrivedCount);
 
-        // Assert — one must succeed (201 Created) and the other must hit the unique violation catch block (409 Conflict)
-        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Created);
-        Assert.Contains(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+        // Assert - exactly one winner (201) and exactly one loser (409) that hit the unique violation catch block
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Created);
+        var loser = Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+        var problemDetails = await loser.AssertProblemDetails(HttpStatusCode.Conflict);
+        Assert.DoesNotContain(email, problemDetails.Detail ?? string.Empty);
 
-        // Verify database integrity — exactly one user was persisted
-        var users = await QueryAllUsersAsync("race_condition@example.com");
-        Assert.Single(users);
+        // Assert - database integrity: exactly one user persisted
+        var user = Assert.Single(await QueryAllUsersAsync(email));
+        Assert.False(user.EmailConfirmed);
+
+        // Assert - only the winner issued a confirmation token and sent an email
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var tokenCount = await db.EmailConfirmationTokens.CountAsync(t => t.UserId == user.Id);
+        Assert.Equal(1, tokenCount);
+
+        var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
+        Assert.Equal(email, sentEmail.ToEmail);
     }
 
     private async Task SeedConfirmedUser(string email, string passwordHash)

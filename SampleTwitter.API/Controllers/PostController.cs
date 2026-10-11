@@ -64,7 +64,7 @@ public class PostController : ControllerBase
     /// <response code="404">No post exists with the given ID.</response>
     /// <response code="500">An unexpected error occurred while processing the request.</response>
     [Authorize]
-    [HttpPut("{id}")]
+    [HttpPut("{id:long}")]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(EditPostResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -93,7 +93,7 @@ public class PostController : ControllerBase
     /// <response code="404">No post exists with the given ID.</response>
     /// <response code="500">An unexpected error occurred while processing the request.</response>
     [Authorize]
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:long}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]

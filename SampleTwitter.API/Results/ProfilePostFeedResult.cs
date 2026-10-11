@@ -1,5 +1,3 @@
-using SampleTwitter.API.DTOs.ResponseDTOs;
-
 namespace SampleTwitter.API.Results;
 
-public record ProfilePostFeedResult(IReadOnlyList<PostFeedItemDto> Items, PostAuthorDto Author);
+public record ProfilePostFeedResult(IReadOnlyList<PostFeedItemResult> Items, PostAuthorResult Author);
