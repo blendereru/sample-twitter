@@ -124,6 +124,37 @@ public class RepostTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task ConcurrentReposts_SameUserAndPost_HandlesPostgresUniqueConstraintRaceCondition()
+    {
+        // Arrange
+        var (author, _) = await SeedAndSignIn("author_race@example.com", "Sup3rSecret1!");
+        var post = await SeedPost(userId: author.Id, text: "race test post");
+
+        var (_, reposterCookie) = await SeedAndSignIn("reposter_race@example.com", "Sup3rSecret1!");
+
+        using var barrier = Factory.RepostInsertBarrier.Arm(participants: 2, timeout: TimeSpan.FromSeconds(10));
+
+        // Act — dispatch concurrent repost requests for the exact same post from the same user
+        var responses = await Task.WhenAll(
+            SendRepostRequest(reposterCookie, post.Id),
+            SendRepostRequest(reposterCookie, post.Id));
+
+        // Assert — the race was actually reproduced: both requests passed the alreadyReposted check
+        // and attempted the INSERT simultaneously
+        Assert.Equal(2, barrier.ArrivedCount);
+
+        // Assert — exactly one winner (200 OK) and exactly one loser (409 Conflict from unique constraint catch block)
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
+
+        // Assert — database contains exactly one repost row
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var count = await db.Reposts.CountAsync(r => r.PostId == post.Id);
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
     public async Task DifferentUsers_CanRepostSamePost_BothPersist()
     {
         // Arrange

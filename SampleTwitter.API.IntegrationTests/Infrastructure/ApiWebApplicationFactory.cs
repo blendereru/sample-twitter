@@ -25,6 +25,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
     public UserInsertBarrierInterceptor UserInsertBarrier { get; } = new();
 
+    public UserInsertBarrierInterceptor RepostInsertBarrier => UserInsertBarrier;
+
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();

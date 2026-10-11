@@ -41,7 +41,8 @@ public sealed class UserInsertBarrierInterceptor : SaveChangesInterceptor
 
         if (barrier is not null &&
             eventData.Context is not null &&
-            eventData.Context.ChangeTracker.Entries<User>().Any(e => e.State == EntityState.Added))
+            (eventData.Context.ChangeTracker.Entries<User>().Any(e => e.State == EntityState.Added) ||
+             eventData.Context.ChangeTracker.Entries<Repost>().Any(e => e.State == EntityState.Added)))
         {
             await barrier.SignalAndWaitAsync(cancellationToken);
         }
@@ -88,7 +89,7 @@ public sealed class UserInsertBarrierInterceptor : SaveChangesInterceptor
             catch (TimeoutException ex)
             {
                 throw new TimeoutException(
-                    $"Only {ArrivedCount} of {_participants} concurrent requests reached the user INSERT " +
+                    $"Only {ArrivedCount} of {_participants} concurrent requests reached the INSERT " +
                     $"within {_timeout}. The race was not reproduced.", ex);
             }
         }

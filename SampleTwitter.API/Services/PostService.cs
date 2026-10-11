@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
@@ -188,7 +189,16 @@ public class PostService : IPostService
         };
 
         _applicationContext.Reposts.Add(repost);
-        await _applicationContext.SaveChangesAsync(ct);
+
+        try
+        {
+            await _applicationContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            _logger.LogWarning(ex, "Race condition: duplicate repost attempt detected during save for post {PostId} by user {UserId}", postId, userId);
+            throw new AlreadyRepostedException($"User {userId} has already reposted post {postId} (race condition).");
+        }
 
         _logger.LogInformation("Post {PostId} reposted by user {UserId}", postId, userId);
 
@@ -303,5 +313,10 @@ public class PostService : IPostService
                 p.Reposts.Count,
                 p.Replies.Count))
             .ToListAsync(ct);
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;
     }
 }
