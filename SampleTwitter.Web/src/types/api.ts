@@ -27,6 +27,68 @@ export interface MeResponse {
   id: number;
   email: string;
   registeredAt: string;
+  username?: string | null;
+  imageUrl?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface UserResponse {
+  id: number;
+  email: string;
+  registeredAt: string;
+  username?: string | null;
+  imageUrl?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface EditProfileRequest {
+  username?: string | null;
+  imageUrl?: string | null;
+}
+
+export interface EditProfileResponse {
+  id: number;
+  username?: string | null;
+  imageUrl?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+}
+
+export interface ChangeEmailRequest {
+  newEmail: string;
+  currentPassword: string;
+}
+
+export interface ChangeEmailResponse {
+  userId: number;
+  email: string;
+  message: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ResetPasswordRequest {
+  userId: number;
+  token: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
 }
 
 export interface CreatePostRequest {

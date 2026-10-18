@@ -1,5 +1,21 @@
 import { apiClient } from './client';
-import type { PostFeedResponse, ReplyFeedResponse } from '@/types/api';
+import type {
+  PostFeedResponse,
+  ReplyFeedResponse,
+  UserResponse,
+  EditProfileRequest,
+  EditProfileResponse,
+} from '@/types/api';
+
+export async function getUser(userId: number): Promise<UserResponse> {
+  const response = await apiClient.get<UserResponse>(`/users/${userId}`);
+  return response.data;
+}
+
+export async function editProfile(userId: number, request: EditProfileRequest): Promise<EditProfileResponse> {
+  const response = await apiClient.put<EditProfileResponse>(`/users/${userId}`, request);
+  return response.data;
+}
 
 export async function getUserPosts(userId: number): Promise<PostFeedResponse> {
   const response = await apiClient.get<PostFeedResponse>(`/users/${userId}/posts`);

@@ -3,10 +3,11 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
-import { getUserPosts, getUserReplies } from '@/api/users';
+import EditProfileModal from '@/components/profile/EditProfileModal.vue';
+import { getUser, getUserPosts, getUserReplies } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostFeedItemDto, ReplyFeedItemDto, PostAuthorDto, RepostResponse } from '@/types/api';
+import type { PostFeedItemDto, ReplyFeedItemDto, PostAuthorDto, RepostResponse, UserResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -27,6 +28,8 @@ const isMyProfile = computed(() => {
 const loading = ref(true);
 const error = ref<string | null>(null);
 const isNotFound = ref(false);
+const userInfo = ref<UserResponse | null>(null);
+const showEditModal = ref(false);
 const posts = ref<PostFeedItemDto[]>([]);
 const replies = ref<ReplyFeedItemDto[]>([]);
 const postsLoaded = ref(false);
@@ -35,6 +38,9 @@ const profileAuthor = ref<PostAuthorDto | null>(null);
 const activeTab = ref<'posts' | 'replies' | 'highlights' | 'media' | 'likes'>('posts');
 
 const profileEmail = computed(() => {
+  if (userInfo.value?.email) {
+    return userInfo.value.email;
+  }
   if (profileAuthor.value?.email) {
     return profileAuthor.value.email;
   }
@@ -45,10 +51,29 @@ const profileEmail = computed(() => {
 });
 
 const profileDisplayName = computed(() => {
+  if (userInfo.value?.username) {
+    return userInfo.value.username;
+  }
+  if (isMyProfile.value && authStore.currentUsername) {
+    return authStore.currentUsername;
+  }
   return profileEmail.value.split('@')[0];
 });
 
+const profileAvatar = computed(() => {
+  if (userInfo.value?.imageUrl) {
+    return userInfo.value.imageUrl;
+  }
+  if (isMyProfile.value && authStore.currentUserImageUrl) {
+    return authStore.currentUserImageUrl;
+  }
+  return getAvatar(targetUserId.value);
+});
+
 const joinedText = computed(() => {
+  if (userInfo.value?.registeredAt) {
+    return formatJoinedDate(userInfo.value.registeredAt);
+  }
   if (isMyProfile.value && authStore.registeredAt) {
     return formatJoinedDate(authStore.registeredAt);
   }
@@ -104,6 +129,17 @@ function getAvatar(userId: number): string {
     : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80';
 }
 
+function handleProfileUpdated(payload: { username?: string | null; imageUrl?: string | null; updatedAt?: string | null }) {
+  if (userInfo.value) {
+    userInfo.value = {
+      ...userInfo.value,
+      username: payload.username ?? null,
+      imageUrl: payload.imageUrl ?? null,
+      updatedAt: payload.updatedAt ?? new Date().toISOString(),
+    };
+  }
+}
+
 async function fetchFeed(tab: 'posts' | 'replies' = activeTab.value === 'replies' ? 'replies' : 'posts', options: { silent?: boolean } = {}) {
   if (!targetUserId.value || isNaN(targetUserId.value)) {
     error.value = 'Invalid user ID.';
@@ -118,6 +154,10 @@ async function fetchFeed(tab: 'posts' | 'replies' = activeTab.value === 'replies
   isNotFound.value = false;
 
   try {
+    if (!userInfo.value || userInfo.value.id !== targetUserId.value) {
+      userInfo.value = await getUser(targetUserId.value);
+    }
+
     if (tab === 'replies') {
       const response = await getUserReplies(targetUserId.value);
       replies.value = response.items || [];
@@ -230,6 +270,7 @@ onMounted(() => {
 watch(
   () => route.params.id,
   () => {
+    userInfo.value = null;
     postsLoaded.value = false;
     repliesLoaded.value = false;
     posts.value = [];
@@ -288,7 +329,7 @@ watch(
         <div class="px-4 pb-4">
           <div class="flex justify-between items-end relative -mt-16 sm:-mt-20 mb-4">
             <img
-              :src="getAvatar(targetUserId)"
+              :src="profileAvatar"
               alt="Profile Avatar"
               class="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-black object-cover bg-neutral-800 shadow-xl"
             />
@@ -296,7 +337,8 @@ watch(
             <div class="mt-2">
               <button
                 v-if="isMyProfile"
-                class="border border-neutral-600 hover:bg-neutral-900 text-white font-bold text-sm px-4 py-1.5 rounded-full transition-colors"
+                @click="showEditModal = true"
+                class="border border-neutral-600 hover:bg-neutral-900 text-white font-bold text-sm px-4 py-1.5 rounded-full transition-colors cursor-pointer"
               >
                 Edit profile
               </button>
@@ -464,7 +506,7 @@ watch(
             :user-id="profileAuthor?.id ?? targetUserId"
             :author="profileDisplayName"
             :handle="'@' + profileEmail"
-            :avatar="getAvatar(profileAuthor?.id ?? targetUserId)"
+            :avatar="profileAvatar"
             :content="post.text || ''"
             :image-url="post.imageUrl"
             :timestamp="formatDate(post.createdAt)"
@@ -590,7 +632,7 @@ watch(
                 :user-id="profileAuthor?.id ?? targetUserId"
                 :author="profileDisplayName"
                 :handle="'@' + profileEmail"
-                :avatar="getAvatar(profileAuthor?.id ?? targetUserId)"
+                :avatar="profileAvatar"
                 :content="reply.text || ''"
                 :image-url="reply.imageUrl"
                 :timestamp="formatDate(reply.createdAt)"
@@ -610,5 +652,16 @@ watch(
         </div>
       </div>
     </div>
+
+    <!-- Edit Profile & Account Settings Modal -->
+    <EditProfileModal
+      v-if="showEditModal && isMyProfile"
+      :user-id="targetUserId"
+      :initial-username="userInfo?.username ?? authStore.currentUsername"
+      :initial-image-url="userInfo?.imageUrl ?? authStore.currentUserImageUrl"
+      :current-email="profileEmail"
+      @close="showEditModal = false"
+      @profile-updated="handleProfileUpdated"
+    />
   </main>
 </template>

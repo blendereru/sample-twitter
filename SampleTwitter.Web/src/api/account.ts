@@ -1,5 +1,20 @@
 import { apiClient } from './client';
-import type { SignUpRequest, SignUpResponse, ConfirmEmailResponse, LoginRequest, LoginResponse, MeResponse } from '@/types/api';
+import type {
+  SignUpRequest,
+  SignUpResponse,
+  ConfirmEmailResponse,
+  LoginRequest,
+  LoginResponse,
+  MeResponse,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  ChangeEmailRequest,
+  ChangeEmailResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
+} from '@/types/api';
 
 export async function signUp(request: SignUpRequest): Promise<SignUpResponse> {
   const response = await apiClient.post<SignUpResponse>('/auth/signup', request);
@@ -27,5 +42,25 @@ export async function confirmEmail(userId: number, token: string): Promise<Confi
 
 export async function getMe(): Promise<MeResponse> {
   const response = await apiClient.get<MeResponse>('/auth/me');
+  return response.data;
+}
+
+export async function changePassword(request: ChangePasswordRequest): Promise<ChangePasswordResponse> {
+  const response = await apiClient.put<ChangePasswordResponse>('/auth/password', request);
+  return response.data;
+}
+
+export async function changeEmail(request: ChangeEmailRequest): Promise<ChangeEmailResponse> {
+  const response = await apiClient.put<ChangeEmailResponse>('/auth/email', request);
+  return response.data;
+}
+
+export async function forgotPassword(request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
+  const response = await apiClient.post<ForgotPasswordResponse>('/auth/forgot-password', request);
+  return response.data;
+}
+
+export async function resetPassword(request: ResetPasswordRequest): Promise<ResetPasswordResponse> {
+  const response = await apiClient.post<ResetPasswordResponse>('/auth/reset-password', request);
   return response.data;
 }

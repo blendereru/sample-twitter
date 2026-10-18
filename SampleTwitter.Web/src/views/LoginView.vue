@@ -48,6 +48,7 @@ async function handleLogin() {
       password: password.value,
     });
     authStore.setAuthenticated(res.userId, res.email);
+    await authStore.fetchCurrentUser();
     router.push('/');
   } catch (err: unknown) {
     const parsed = parseApiError(err);
@@ -94,16 +95,23 @@ async function handleLogin() {
           required
         />
 
-        <InputField
-          id="login-password"
-          label="Password"
-          type="password"
-          v-model="password"
-          placeholder="Your password"
-          :error="fieldErrors.password"
-          :disabled="loading"
-          required
-        />
+        <div class="flex flex-col gap-1">
+          <InputField
+            id="login-password"
+            label="Password"
+            type="password"
+            v-model="password"
+            placeholder="Your password"
+            :error="fieldErrors.password"
+            :disabled="loading"
+            required
+          />
+          <div class="flex justify-end">
+            <router-link to="/forgot-password" class="text-xs text-sky-400 hover:underline">
+              Forgot password?
+            </router-link>
+          </div>
+        </div>
 
         <button
           type="submit"

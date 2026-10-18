@@ -84,18 +84,29 @@ function handleLogout() {
 
     <div v-if="authStore.isAuthenticated" class="p-2 rounded-full hover:bg-neutral-800/60 flex items-center justify-between transition-colors">
       <router-link :to="profilePath" class="flex items-center gap-3 flex-1 min-w-0">
-        <div class="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-sky-400 shrink-0">
-          U
+        <img
+          v-if="authStore.currentUserImageUrl"
+          :src="authStore.currentUserImageUrl"
+          alt="User avatar"
+          class="w-10 h-10 rounded-full object-cover bg-neutral-800 shrink-0"
+        />
+        <div
+          v-else
+          class="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-sky-400 shrink-0 uppercase"
+        >
+          {{ (authStore.currentUsername || authStore.currentUserEmail || 'U')[0] }}
         </div>
         <div class="hidden xl:flex flex-col text-sm truncate">
-          <span class="font-bold text-white truncate">User #{{ authStore.currentUserId }}</span>
+          <span class="font-bold text-white truncate">
+            {{ authStore.currentUsername || (authStore.currentUserEmail ? authStore.currentUserEmail.split('@')[0] : `User #${authStore.currentUserId}`) }}
+          </span>
           <span class="text-neutral-500 text-xs truncate max-w-[120px]">{{ authStore.currentUserEmail || 'Signed in' }}</span>
         </div>
       </router-link>
       <button
         @click="handleLogout"
         title="Sign out"
-        class="p-2 hover:bg-red-500/10 rounded-full text-neutral-400 hover:text-red-400 transition-colors"
+        class="p-2 hover:bg-red-500/10 rounded-full text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
       >
         <LogOut class="w-4 h-4" />
       </button>
