@@ -362,7 +362,7 @@ public class ForgotPasswordTests : IntegrationTestBase
         var query = QueryHelpers.ParseQuery(uri.Query);
 
         var userId = long.Parse(query["userId"]!);
-        var token = query["token"]!;
+        var token = query["token"];
         return (userId, token)!;
     }
 }
