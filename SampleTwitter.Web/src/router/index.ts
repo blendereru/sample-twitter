@@ -4,6 +4,7 @@ import SignUpView from '@/views/SignUpView.vue';
 import LoginView from '@/views/LoginView.vue';
 import ConfirmEmailView from '@/views/ConfirmEmailView.vue';
 import ProfileView from '@/views/ProfileView.vue';
+import PostDetailView from '@/views/PostDetailView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -40,6 +41,11 @@ const router = createRouter({
         const storedUserId = localStorage.getItem('sampletwitter_user_id');
         return storedUserId ? `/profile/${storedUserId}` : '/login';
       },
+    },
+    {
+      path: '/post/:id',
+      name: 'post-detail',
+      component: PostDetailView,
     },
   ],
 });

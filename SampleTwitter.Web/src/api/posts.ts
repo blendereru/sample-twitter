@@ -26,6 +26,11 @@ export async function undoRepost(id: number): Promise<void> {
 
 export const undoRepostPost = undoRepost;
 
+export async function getPostById(id: number): Promise<PostResponse> {
+  const response = await apiClient.get<PostResponse>(`/posts/${id}`);
+  return response.data;
+}
+
 export async function getPostReplies(id: number): Promise<PostResponse[]> {
   const response = await apiClient.get<PostResponse[]>(`/posts/${id}/replies`);
   return response.data;

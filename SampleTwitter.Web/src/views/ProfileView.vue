@@ -215,6 +215,25 @@ function handlePostUndoReposted(postId: number) {
   }
 }
 
+function handlePostReplied(payload: { parentPostId: number; replyId: number }) {
+  for (const p of posts.value) {
+    if (p.id === payload.parentPostId) {
+      p.replyCount = (p.replyCount || 0) + 1;
+    }
+  }
+  for (const r of replies.value) {
+    if (r.id === payload.parentPostId) {
+      r.replyCount = (r.replyCount || 0) + 1;
+    }
+  }
+  if (isMyProfile.value) {
+    repliesLoaded.value = false;
+    if (activeTab.value === 'replies') {
+      fetchFeed('replies', { silent: true });
+    }
+  }
+}
+
 function goBack() {
   if (window.history.length > 1) {
     router.back();
@@ -477,6 +496,7 @@ watch(
             @delete="handlePostDeleted"
             @reposted="handlePostReposted"
             @undo-repost="handlePostUndoReposted"
+            @replied="handlePostReplied"
             class="!border-b-0"
           />
         </div>
@@ -503,13 +523,18 @@ watch(
             class="flex flex-col border-b border-neutral-800"
           >
             <!-- Parent Post Context -->
-            <div v-if="reply.parentPost" class="px-4 pt-3 pb-1 flex gap-3 relative">
+            <div
+              v-if="reply.parentPost"
+              @click="router.push(`/post/${reply.parentPost.id}`)"
+              class="px-4 pt-3 pb-1 flex gap-3 relative hover:bg-neutral-950/50 transition-colors cursor-pointer"
+            >
               <!-- Avatar & vertical thread line to reply -->
               <div class="flex flex-col items-center">
                 <img
                   v-if="reply.parentPost.author"
                   :src="getAvatar(reply.parentPost.author.id)"
-                  class="w-10 h-10 rounded-full object-cover shrink-0 bg-neutral-800"
+                  @click.stop="router.push(`/profile/${reply.parentPost.author.id}`)"
+                  class="w-10 h-10 rounded-full object-cover shrink-0 bg-neutral-800 hover:opacity-90"
                   alt="Parent Author Avatar"
                 />
                 <div
@@ -525,7 +550,10 @@ watch(
               <div class="flex flex-col gap-1 w-full pb-2">
                 <div class="flex items-center gap-1.5 text-xs text-neutral-500 flex-wrap">
                   <template v-if="reply.parentPost.author">
-                    <span class="font-bold text-white hover:underline">
+                    <span
+                      @click.stop="router.push(`/profile/${reply.parentPost.author.id}`)"
+                      class="font-bold text-white hover:underline"
+                    >
                       {{ reply.parentPost.author.email.split('@')[0] }}
                     </span>
                     <span class="text-neutral-500">
@@ -536,7 +564,7 @@ watch(
                     Post #{{ reply.parentPost.id }}
                   </span>
                   <span class="text-neutral-600">·</span>
-                  <span class="text-neutral-500">{{ formatDate(reply.parentPost.createdAt) }}</span>
+                  <span class="text-neutral-500 hover:underline">{{ formatDate(reply.parentPost.createdAt) }}</span>
                 </div>
 
                 <p v-if="reply.parentPost.text" class="text-sm leading-relaxed text-neutral-300 whitespace-pre-line">
@@ -569,7 +597,10 @@ watch(
             <div class="relative">
               <div class="text-xs text-neutral-500 px-4 pt-1.5 pb-0 flex items-center gap-1.5 ml-13">
                 <span>Replying to</span>
-                <span class="text-sky-500 font-medium hover:underline">
+                <span
+                  @click="reply.parentPost ? router.push(`/post/${reply.parentPost.id}`) : undefined"
+                  :class="['text-sky-500 font-medium', reply.parentPost ? 'hover:underline cursor-pointer' : '']"
+                >
                   {{ reply.parentPost?.author ? `@${reply.parentPost.author.email.split('@')[0]}` : reply.parentPost ? `Post #${reply.parentPost.id}` : 'a deleted post' }}
                 </span>
               </div>
@@ -592,6 +623,7 @@ watch(
                 @delete="handleReplyDeleted"
                 @reposted="handlePostReposted"
                 @undo-repost="handlePostUndoReposted"
+                @replied="handlePostReplied"
                 class="!border-b-0 !pt-2"
               />
             </div>
