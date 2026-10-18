@@ -9,6 +9,7 @@ public class ApplicationContext : DbContext
 
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<EmailConfirmationToken> EmailConfirmationTokens { get; set; } = null!;
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; } = null!;
     public DbSet<Post> Posts { get; set; } = null!;
     public DbSet<Repost> Reposts { get; set; } = null!;
 
@@ -17,6 +18,7 @@ public class ApplicationContext : DbContext
         modelBuilder.Entity<User>(builder =>
         {
             builder.HasIndex(u => u.Email).IsUnique();
+            builder.Property(u => u.Username).HasMaxLength(50);
         });
 
         modelBuilder.Entity<Repost>(builder =>
@@ -39,6 +41,17 @@ public class ApplicationContext : DbContext
         });
 
         modelBuilder.Entity<EmailConfirmationToken>(builder =>
+        {
+            builder.HasOne(t => t.User)
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(t => t.TokenHash).IsUnique();
+            builder.HasIndex(t => new { t.UserId, t.UsedAt });
+        });
+
+        modelBuilder.Entity<PasswordResetToken>(builder =>
         {
             builder.HasOne(t => t.User)
                 .WithMany()
