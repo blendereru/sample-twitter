@@ -108,13 +108,6 @@ function handleTweetUndoReposted(postId: number) {
     tweet.isReposted = false;
   }
 }
-
-function handleTweetReplied(payload: { parentPostId: number; replyId: number }) {
-  const tweet = tweets.value.find(t => t.id === payload.parentPostId);
-  if (tweet) {
-    tweet.replies = (tweet.replies || 0) + 1;
-  }
-}
 </script>
 
 <template>
@@ -169,7 +162,6 @@ function handleTweetReplied(payload: { parentPostId: number; replyId: number }) 
         @delete="handleDeleteTweet"
         @reposted="handleTweetReposted"
         @undo-repost="handleTweetUndoReposted"
-        @replied="handleTweetReplied"
       />
     </div>
   </main>

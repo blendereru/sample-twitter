@@ -215,25 +215,6 @@ function handlePostUndoReposted(postId: number) {
   }
 }
 
-function handlePostReplied(payload: { parentPostId: number; replyId: number }) {
-  for (const p of posts.value) {
-    if (p.id === payload.parentPostId) {
-      p.replyCount = (p.replyCount || 0) + 1;
-    }
-  }
-  for (const r of replies.value) {
-    if (r.id === payload.parentPostId) {
-      r.replyCount = (r.replyCount || 0) + 1;
-    }
-  }
-  if (isMyProfile.value) {
-    repliesLoaded.value = false;
-    if (activeTab.value === 'replies') {
-      fetchFeed('replies', { silent: true });
-    }
-  }
-}
-
 function goBack() {
   if (window.history.length > 1) {
     router.back();
@@ -496,7 +477,6 @@ watch(
             @delete="handlePostDeleted"
             @reposted="handlePostReposted"
             @undo-repost="handlePostUndoReposted"
-            @replied="handlePostReplied"
             class="!border-b-0"
           />
         </div>
@@ -623,7 +603,6 @@ watch(
                 @delete="handleReplyDeleted"
                 @reposted="handlePostReposted"
                 @undo-repost="handlePostUndoReposted"
-                @replied="handlePostReplied"
                 class="!border-b-0 !pt-2"
               />
             </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Loader2, AlertCircle, RefreshCw, MessageSquare, Image as ImageIcon, X } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
@@ -19,9 +19,12 @@ const error = ref<string | null>(null);
 const isNotFound = ref(false);
 
 const post = ref<PostResponse | null>(null);
+const parentPost = ref<PostResponse | null>(null);
+const parentPostDeleted = ref(false);
 const replies = ref<PostResponse[]>([]);
 const myRepostedIds = ref<Set<number>>(new Set());
 
+const replyTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const replyText = ref('');
 const replyImageUrl = ref('');
 const showReplyImageInput = ref(false);
@@ -59,6 +62,14 @@ function formatDate(dateStr: string): string {
   }
 }
 
+function focusReplyInput() {
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+  replyTextareaRef.value?.focus();
+}
+
 async function fetchPostAndReplies(options: { silent?: boolean } = {}) {
   if (!postId.value || isNaN(postId.value) || postId.value <= 0) {
     isNotFound.value = true;
@@ -71,6 +82,8 @@ async function fetchPostAndReplies(options: { silent?: boolean } = {}) {
   }
   error.value = null;
   isNotFound.value = false;
+  parentPost.value = null;
+  parentPostDeleted.value = false;
 
   try {
     const [postData, repliesData] = await Promise.all([
@@ -79,6 +92,20 @@ async function fetchPostAndReplies(options: { silent?: boolean } = {}) {
     ]);
     post.value = postData;
     replies.value = repliesData || [];
+
+    if (postData.replyId) {
+      try {
+        parentPost.value = await getPostById(postData.replyId);
+      } catch {
+        parentPost.value = null;
+        parentPostDeleted.value = true;
+      }
+    }
+
+    if (route.query.reply === '1') {
+      await nextTick();
+      replyTextareaRef.value?.focus();
+    }
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     if (parsed.status === 404) {
@@ -145,7 +172,11 @@ function handleMainPostUpdated(updated: { id: number; text?: string; imageUrl?: 
 }
 
 function handleMainPostDeleted() {
-  router.push('/');
+  if (post.value?.replyId) {
+    router.push(`/post/${post.value.replyId}`);
+  } else {
+    router.push('/');
+  }
 }
 
 function handleReplyUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
@@ -183,19 +214,6 @@ function handleUndoRepost(id: number) {
   const reply = replies.value.find(r => r.id === id);
   if (reply) {
     reply.repostCount = Math.max(0, (reply.repostCount || 0) - 1);
-  }
-}
-
-async function handleNestedReplied(payload: { parentPostId: number; replyId: number }) {
-  if (post.value && payload.parentPostId === post.value.id) {
-    const updatedReplies = await getPostReplies(post.value.id);
-    replies.value = updatedReplies || [];
-    post.value.replyCount = replies.value.length;
-  } else {
-    const item = replies.value.find(r => r.id === payload.parentPostId);
-    if (item) {
-      item.replyCount = (item.replyCount || 0) + 1;
-    }
   }
 }
 
@@ -280,22 +298,61 @@ watch(
 
     <!-- Post & Replies Thread -->
     <div v-else-if="post" class="flex flex-col">
-      <!-- Parent Post Link if this post is itself a reply -->
+      <!-- Parent Post Context (X-style thread line above focused reply) -->
       <div
-        v-if="post.replyId"
-        class="px-4 pt-3 pb-1 text-xs text-neutral-500 flex items-center gap-1.5"
+        v-if="parentPost"
+        @click="router.push(`/post/${parentPost.id}`)"
+        class="px-4 pt-3 pb-1 flex gap-3 relative hover:bg-neutral-950/50 transition-colors cursor-pointer"
       >
-        <span>Replying to</span>
-        <button
-          type="button"
-          @click="router.push(`/post/${post.replyId}`)"
-          class="text-sky-500 hover:underline font-medium cursor-pointer"
-        >
-          Post #{{ post.replyId }}
-        </button>
+        <div class="flex flex-col items-center">
+          <img
+            :src="getAvatar(parentPost.author.id)"
+            @click.stop="router.push(`/profile/${parentPost.author.id}`)"
+            class="w-10 h-10 rounded-full object-cover shrink-0 bg-neutral-800 hover:opacity-90"
+            alt="Parent Author Avatar"
+          />
+          <div class="w-0.5 bg-neutral-700/80 grow mt-1.5 -mb-3"></div>
+        </div>
+
+        <div class="flex flex-col gap-1 w-full pb-2">
+          <div class="flex items-center gap-1.5 text-sm flex-wrap">
+            <span
+              @click.stop="router.push(`/profile/${parentPost.author.id}`)"
+              class="font-bold text-white hover:underline"
+            >
+              {{ parentPost.author.email.split('@')[0] }}
+            </span>
+            <span class="text-neutral-500">@{{ parentPost.author.email }}</span>
+            <span class="text-neutral-600">·</span>
+            <span class="text-neutral-500 hover:underline">{{ formatDate(parentPost.createdAt) }}</span>
+          </div>
+
+          <p v-if="parentPost.text" class="text-sm leading-relaxed text-neutral-300 whitespace-pre-line">
+            {{ parentPost.text }}
+          </p>
+
+          <div v-if="parentPost.imageUrl" class="mt-2 rounded-2xl overflow-hidden border border-neutral-800 max-h-60 max-w-md">
+            <img :src="parentPost.imageUrl" alt="Parent post image" class="w-full h-full object-cover" />
+          </div>
+        </div>
       </div>
 
-      <!-- Main Post Card -->
+      <!-- Deleted Parent Post Indicator -->
+      <div v-else-if="parentPostDeleted" class="px-4 pt-3 pb-1 flex gap-3 relative">
+        <div class="flex flex-col items-center">
+          <div class="w-10 h-10 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center shrink-0 text-neutral-500">
+            <AlertCircle class="w-4 h-4" />
+          </div>
+          <div class="w-0.5 bg-neutral-800 grow mt-1.5 -mb-3"></div>
+        </div>
+        <div class="flex flex-col gap-1 w-full pb-2 justify-center">
+          <span class="text-xs text-neutral-500 italic bg-neutral-900/60 border border-neutral-800/80 rounded-xl px-3 py-2 w-fit">
+            This post was deleted.
+          </span>
+        </div>
+      </div>
+
+      <!-- Focused Main Post Card -->
       <TweetCard
         :id="post.id"
         :user-id="post.author.id"
@@ -305,16 +362,17 @@ watch(
         :content="post.text || ''"
         :image-url="post.imageUrl"
         :timestamp="formatDate(post.createdAt)"
+        :created-at="post.createdAt"
         :updated-at="post.updatedAt"
         :retweets="post.repostCount"
         :replies="replies.length"
         :is-reposted="myRepostedIds.has(post.id)"
-        :hide-thread-link="true"
+        :is-focused="true"
         @updated="handleMainPostUpdated"
         @delete="handleMainPostDeleted"
         @reposted="handleReposted"
         @undo-repost="handleUndoRepost"
-        @replied="handleNestedReplied"
+        @reply-click="focusReplyInput"
       />
 
       <!-- Reply Composer -->
@@ -336,6 +394,7 @@ watch(
 
           <div class="flex flex-col w-full gap-2.5">
             <textarea
+              ref="replyTextareaRef"
               v-model="replyText"
               rows="2"
               placeholder="Post your reply"
@@ -400,11 +459,6 @@ watch(
         </div>
       </div>
 
-      <!-- Replies List Header -->
-      <div class="px-4 py-2.5 border-b border-neutral-800 bg-neutral-950/40 text-xs font-bold text-neutral-400 flex items-center justify-between">
-        <span>Replies ({{ replies.length }})</span>
-      </div>
-
       <!-- Empty Replies State -->
       <div v-if="replies.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
         <div class="w-14 h-14 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-3">
@@ -416,7 +470,7 @@ watch(
         </p>
       </div>
 
-      <!-- Replies Feed -->
+      <!-- Replies Feed (Each reply is clickable to focus that reply & view its replies) -->
       <div v-else class="flex flex-col">
         <TweetCard
           v-for="reply in replies"
@@ -437,7 +491,6 @@ watch(
           @delete="handleReplyDeleted"
           @reposted="handleReposted"
           @undo-repost="handleUndoRepost"
-          @replied="handleNestedReplied"
         />
       </div>
     </div>
