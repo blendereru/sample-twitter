@@ -655,7 +655,7 @@ watch(
 
     <!-- Edit Profile & Account Settings Modal -->
     <EditProfileModal
-      v-if="showEditModal && isMyProfile"
+      v-if="showEditModal"
       :user-id="targetUserId"
       :initial-username="userInfo?.username ?? authStore.currentUsername"
       :initial-image-url="userInfo?.imageUrl ?? authStore.currentUserImageUrl"

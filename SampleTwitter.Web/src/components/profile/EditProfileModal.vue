@@ -105,6 +105,7 @@ async function handleSaveProfile() {
 
 // --- Change Email State ---
 const newEmail = ref('');
+const updatedEmailAddress = ref('');
 const emailCurrentPassword = ref('');
 const emailLoading = ref(false);
 const emailError = ref<string | null>(null);
@@ -137,13 +138,15 @@ async function handleSaveEmail() {
 
   emailLoading.value = true;
   try {
+    const targetEmail = newEmail.value.trim();
     const res = await changeEmail({
-      newEmail: newEmail.value.trim(),
+      newEmail: targetEmail,
       currentPassword: emailCurrentPassword.value,
     });
+    updatedEmailAddress.value = res.email || targetEmail;
     emailChangedSuccessMessage.value =
-      res.message || 'Email updated. Please check your new email inbox to confirm your address.';
-    authStore.clearAuth();
+      res.message || 'Email updated. Please check your new email inbox and click the confirmation link to activate your new address.';
+    emailCurrentPassword.value = '';
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     if (parsed.fieldErrors) {
@@ -162,7 +165,18 @@ async function handleSaveEmail() {
   }
 }
 
+function handleCloseModal() {
+  if (emailChangedSuccessMessage.value) {
+    authStore.clearAuth();
+    emit('close');
+    router.push('/login');
+    return;
+  }
+  emit('close');
+}
+
 function finishEmailChangeAndGoToLogin() {
+  authStore.clearAuth();
   emit('close');
   router.push('/login');
 }
@@ -242,14 +256,14 @@ async function handleSavePassword() {
 <template>
   <div
     class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-    @click.self="emit('close')"
+    @click.self="handleCloseModal"
   >
     <div class="w-full max-w-lg bg-neutral-950 border border-neutral-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
       <!-- Modal Header -->
       <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
         <div class="flex items-center gap-3">
           <button
-            @click="emit('close')"
+            @click="handleCloseModal"
             class="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer"
             aria-label="Close modal"
           >
@@ -375,13 +389,20 @@ async function handleSavePassword() {
             <div class="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
               <CheckCircle2 class="w-7 h-7" />
             </div>
-            <h3 class="text-lg font-bold text-white">Confirm your new email</h3>
-            <p class="text-sm text-neutral-300 leading-relaxed">{{ emailChangedSuccessMessage }}</p>
+            <h3 class="text-lg font-bold text-white">Confirmation email sent!</h3>
+            <AlertBanner
+              type="success"
+              :message="emailChangedSuccessMessage"
+            />
+            <p class="text-xs text-neutral-400 leading-relaxed">
+              We sent a confirmation link to <strong class="text-white">{{ updatedEmailAddress }}</strong>.
+              Please open your email and click the confirmation link to verify your new address and sign back in.
+            </p>
             <button
               @click="finishEmailChangeAndGoToLogin"
               class="mt-2 w-full bg-sky-500 hover:bg-sky-400 text-white font-bold py-2.5 rounded-full text-sm transition-colors cursor-pointer"
             >
-              Go to Sign in
+              Got it, go to Sign in
             </button>
           </div>
 
