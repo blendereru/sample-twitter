@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, MoreHorizontal, Trash2, UserX, VolumeX, Flag, AlertCircle } from 'lucide-vue-next';
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, Link2, MoreHorizontal, Trash2, UserX, VolumeX, Flag, AlertCircle } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { editPost, deletePost, repostPost, undoRepost } from '@/api/posts';
+import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import type { RepostResponse } from '@/types/api';
 
@@ -180,7 +181,9 @@ const editText = ref('');
 const editImageUrl = ref('');
 const showImageInput = ref(false);
 const loading = ref(false);
+const uploadingEditImage = ref(false);
 const error = ref<string | null>(null);
+const editFileInputRef = ref<HTMLInputElement | null>(null);
 
 const showDeleteModal = ref(false);
 const isDeleting = ref(false);
@@ -205,8 +208,45 @@ const remainingChars = computed(() => 280 - editText.value.length);
 const isValid = computed(() => {
   const hasText = editText.value.trim().length > 0;
   const hasImage = editImageUrl.value.trim().length > 0;
-  return (hasText || hasImage) && remainingChars.value >= 0;
+  return (hasText || hasImage) && remainingChars.value >= 0 && !uploadingEditImage.value;
 });
+
+function triggerEditFileInput() {
+  if (loading.value || uploadingEditImage.value) return;
+  editFileInputRef.value?.click();
+}
+
+async function handleEditFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+
+  const validationError = validateImageFile(file);
+  if (validationError) {
+    error.value = validationError;
+    return;
+  }
+
+  uploadingEditImage.value = true;
+  error.value = null;
+
+  try {
+    const res = await uploadImage(file);
+    editImageUrl.value = res.url;
+    showImageInput.value = false;
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    error.value = parsed.detail || parsed.message || 'Failed to upload image.';
+  } finally {
+    uploadingEditImage.value = false;
+  }
+}
+
+function clearEditImage() {
+  editImageUrl.value = '';
+  showImageInput.value = false;
+}
 
 function goToProfile(userId?: number) {
   if (userId && userId > 0) {
@@ -318,7 +358,7 @@ onUnmounted(() => {
 function startEditing() {
   editText.value = props.content || '';
   editImageUrl.value = props.imageUrl || '';
-  showImageInput.value = !!props.imageUrl;
+  showImageInput.value = false;
   error.value = null;
   isEditing.value = true;
 }
@@ -383,7 +423,7 @@ const fullUpdatedAtTooltip = computed(() => {
 });
 
 async function handleSave() {
-  if (!isValid.value || loading.value) return;
+  if (!isValid.value || loading.value || uploadingEditImage.value) return;
 
   loading.value = true;
   error.value = null;
@@ -539,17 +579,30 @@ async function handleSave() {
           class="w-full bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-white text-sm placeholder-neutral-500 resize-none focus:outline-none focus:border-sky-500 disabled:opacity-50"
         ></textarea>
 
+        <input
+          ref="editFileInputRef"
+          type="file"
+          :accept="ALLOWED_IMAGE_ACCEPT"
+          class="hidden"
+          @change="handleEditFileSelect"
+        />
+
+        <div v-if="uploadingEditImage" class="flex items-center gap-2 text-xs text-sky-400 bg-neutral-900/80 border border-neutral-800 rounded-xl p-2.5">
+          <Loader2 class="w-4 h-4 animate-spin shrink-0" />
+          <span>Uploading image...</span>
+        </div>
+
         <div v-if="showImageInput" class="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-xl p-2">
           <input
             v-model="editImageUrl"
             type="url"
             placeholder="Enter image URL"
-            :disabled="loading"
+            :disabled="loading || uploadingEditImage"
             class="bg-transparent text-sm text-white placeholder-neutral-500 focus:outline-none w-full"
           />
           <button
             type="button"
-            @click="showImageInput = false; editImageUrl = ''"
+            @click="clearEditImage"
             class="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
           >
             <X class="w-4 h-4" />
@@ -558,17 +611,34 @@ async function handleSave() {
 
         <div v-if="editImageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
           <img :src="editImageUrl" alt="Preview" class="w-full h-full object-cover" />
+          <button
+            type="button"
+            @click="clearEditImage"
+            title="Remove image"
+            class="absolute top-2 right-2 bg-black/75 hover:bg-black text-white p-1.5 rounded-full transition-colors cursor-pointer"
+          >
+            <X class="w-4 h-4" />
+          </button>
         </div>
 
         <div class="flex items-center justify-between pt-1">
           <div class="flex items-center gap-2">
             <button
               type="button"
-              @click="showImageInput = !showImageInput"
-              title="Add Image URL"
-              :class="['p-1.5 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors', showImageInput ? 'bg-sky-500/20 text-white' : '']"
+              @click="triggerEditFileInput"
+              :disabled="loading || uploadingEditImage"
+              title="Upload Image"
+              class="p-1.5 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <ImageIcon class="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              @click="showImageInput = !showImageInput"
+              title="Add Image URL"
+              :class="['p-1.5 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors cursor-pointer', showImageInput ? 'bg-sky-500/20 text-white' : '']"
+            >
+              <Link2 class="w-4 h-4" />
             </button>
             <span
               v-if="editText.length > 0"
@@ -585,7 +655,7 @@ async function handleSave() {
             <button
               type="button"
               @click="cancelEditing"
-              :disabled="loading"
+              :disabled="loading || uploadingEditImage"
               class="px-3 py-1.5 rounded-full text-xs font-semibold text-neutral-300 hover:bg-neutral-800 transition-colors"
             >
               Cancel
@@ -593,7 +663,7 @@ async function handleSave() {
             <button
               type="button"
               @click="handleSave"
-              :disabled="!isValid || loading"
+              :disabled="!isValid || loading || uploadingEditImage"
               class="px-4 py-1.5 rounded-full text-xs font-bold bg-sky-500 hover:bg-sky-400 text-white disabled:opacity-50 transition-colors flex items-center gap-1.5"
             >
               <Loader2 v-if="loading" class="w-3 h-3 animate-spin" />

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { X, Loader2, User, Mail, Lock, CheckCircle2 } from 'lucide-vue-next';
+import { X, Loader2, User, Mail, Lock, CheckCircle2, Upload } from 'lucide-vue-next';
 import InputField from '@/components/common/InputField.vue';
 import AlertBanner from '@/components/common/AlertBanner.vue';
 import { editProfile } from '@/api/users';
 import { changeEmail, changePassword } from '@/api/account';
+import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 
@@ -30,9 +31,44 @@ const activeSection = ref<'profile' | 'email' | 'password'>('profile');
 const username = ref(props.initialUsername ?? '');
 const imageUrl = ref(props.initialImageUrl ?? '');
 const profileLoading = ref(false);
+const avatarUploading = ref(false);
 const profileError = ref<string | null>(null);
 const profileSuccess = ref<string | null>(null);
 const profileFieldErrors = ref<{ username?: string; imageUrl?: string }>({});
+const avatarFileInputRef = ref<HTMLInputElement | null>(null);
+
+function triggerAvatarFileInput() {
+  if (profileLoading.value || avatarUploading.value) return;
+  avatarFileInputRef.value?.click();
+}
+
+async function handleAvatarFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+
+  profileError.value = null;
+  profileSuccess.value = null;
+  profileFieldErrors.value.imageUrl = undefined;
+
+  const validationError = validateImageFile(file);
+  if (validationError) {
+    profileFieldErrors.value.imageUrl = validationError;
+    return;
+  }
+
+  avatarUploading.value = true;
+  try {
+    const res = await uploadImage(file);
+    imageUrl.value = res.url;
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    profileError.value = parsed.detail || parsed.message || 'Failed to upload profile image.';
+  } finally {
+    avatarUploading.value = false;
+  }
+}
 
 function validateProfile(): boolean {
   profileFieldErrors.value = {};
@@ -42,7 +78,7 @@ function validateProfile(): boolean {
   const trimmedImage = imageUrl.value.trim();
 
   if (!trimmedUsername && !trimmedImage) {
-    profileError.value = 'Please provide at least a display name or a profile image URL.';
+    profileError.value = 'Please provide at least a display name or a profile image.';
     return false;
   }
 
@@ -69,6 +105,7 @@ function validateProfile(): boolean {
 
 async function handleSaveProfile() {
   profileSuccess.value = null;
+  if (avatarUploading.value) return;
   if (!validateProfile()) return;
 
   profileLoading.value = true;
@@ -328,23 +365,45 @@ async function handleSavePassword() {
           <AlertBanner v-if="profileError" type="error" :message="profileError" />
           <AlertBanner v-if="profileSuccess" type="success" :message="profileSuccess" />
 
-          <!-- Avatar Preview -->
-          <div class="flex items-center gap-4 pb-2">
-            <img
-              v-if="imageUrl.trim()"
-              :src="imageUrl.trim()"
-              alt="Avatar preview"
-              class="w-16 h-16 rounded-full object-cover border-2 border-neutral-700 bg-neutral-900 shrink-0"
-            />
-            <div
-              v-else
-              class="w-16 h-16 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-xl font-bold text-sky-400 shrink-0 uppercase"
-            >
-              {{ (username.trim() || currentEmail || 'U')[0] }}
+          <!-- Avatar Preview & Upload -->
+          <div class="flex items-center justify-between gap-4 pb-2">
+            <div class="flex items-center gap-4">
+              <img
+                v-if="imageUrl.trim()"
+                :src="imageUrl.trim()"
+                alt="Avatar preview"
+                class="w-16 h-16 rounded-full object-cover border-2 border-neutral-700 bg-neutral-900 shrink-0"
+              />
+              <div
+                v-else
+                class="w-16 h-16 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-xl font-bold text-sky-400 shrink-0 uppercase"
+              >
+                {{ (username.trim() || currentEmail || 'U')[0] }}
+              </div>
+              <div class="flex flex-col text-xs text-neutral-400">
+                <span class="font-semibold text-neutral-200">Profile Preview</span>
+                <span>Upload an image or provide an image URL.</span>
+              </div>
             </div>
-            <div class="flex flex-col text-xs text-neutral-400">
-              <span class="font-semibold text-neutral-200">Profile Preview</span>
-              <span>Provide a display name, an image URL, or both.</span>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <input
+                ref="avatarFileInputRef"
+                type="file"
+                :accept="ALLOWED_IMAGE_ACCEPT"
+                class="hidden"
+                @change="handleAvatarFileSelect"
+              />
+              <button
+                type="button"
+                @click="triggerAvatarFileInput"
+                :disabled="profileLoading || avatarUploading"
+                class="px-3.5 py-2 rounded-full border border-neutral-700 hover:bg-neutral-900 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Loader2 v-if="avatarUploading" class="w-3.5 h-3.5 animate-spin text-sky-400" />
+                <Upload v-else class="w-3.5 h-3.5 text-sky-400" />
+                <span>{{ avatarUploading ? 'Uploading...' : 'Upload photo' }}</span>
+              </button>
             </div>
           </div>
 
@@ -370,12 +429,12 @@ async function handleSavePassword() {
             v-model="imageUrl"
             placeholder="https://example.com/avatar.png"
             :error="profileFieldErrors.imageUrl"
-            :disabled="profileLoading"
+            :disabled="profileLoading || avatarUploading"
           />
 
           <button
             type="submit"
-            :disabled="profileLoading"
+            :disabled="profileLoading || avatarUploading"
             class="mt-2 w-full bg-white hover:bg-neutral-200 text-black font-bold py-2.5 rounded-full flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm cursor-pointer"
           >
             <Loader2 v-if="profileLoading" class="w-4 h-4 animate-spin" />

@@ -188,3 +188,8 @@ export interface ApiError {
   detail?: string;
   fieldErrors?: Record<string, string[]>;
 }
+
+
+export interface UploadImageResponse {
+  url: string;
+}
