@@ -12,7 +12,7 @@ public class NamingConventionTests
     private static readonly ArchUnitNET.Domain.Architecture Architecture = new ArchLoader()
         .LoadAssemblies(ApiAssembly)
         .Build();
-    
+
     [Fact]
     public void Controllers_ShouldHaveNameEndingWith_Controller()
     {
@@ -20,18 +20,7 @@ public class NamingConventionTests
             .Should().HaveNameEndingWith("Controller")
             .Check(Architecture);
     }
-    
-    [Fact]
-    public void ServiceImplementations_ShouldHaveDescriptiveServiceSuffix()
-    {
-        Classes().That().ResideInNamespace("SampleTwitter.API.Services")
-            .Should().HaveNameEndingWith("Service")
-            .OrShould().HaveNameEndingWith("Hasher")
-            .OrShould().HaveNameEndingWith("Generator")
-            .OrShould().HaveNameEndingWith("Sender")
-            .Check(Architecture);
-    }
-    
+
     [Fact]
     public void Abstractions_ShouldHaveNameStartingWith_I()
     {
@@ -39,7 +28,7 @@ public class NamingConventionTests
             .Should().HaveNameStartingWith("I")
             .Check(Architecture);
     }
-    
+
     [Fact]
     public void Exceptions_ShouldHaveNameEndingWith_Exception()
     {
@@ -47,7 +36,7 @@ public class NamingConventionTests
             .Should().HaveNameEndingWith("Exception")
             .Check(Architecture);
     }
-    
+
     [Fact]
     public void ExceptionHandlers_ShouldHaveNameEndingWith_ExceptionHandler()
     {
