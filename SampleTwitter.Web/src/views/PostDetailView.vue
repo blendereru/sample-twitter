@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Loader2, AlertCircle, RefreshCw, MessageSquare, Image as ImageIcon, X } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
+import ImageLightbox from '@/components/common/ImageLightbox.vue';
 import { getPostById, getPostReplies, createPost } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
@@ -368,7 +369,7 @@ watch(
           </p>
 
           <div v-if="parentPost.imageUrl" class="mt-2 rounded-2xl overflow-hidden border border-neutral-800 max-h-60 max-w-md">
-            <img :src="parentPost.imageUrl" alt="Parent post image" class="w-full h-full object-cover" />
+            <ImageLightbox :src="parentPost.imageUrl" alt="Parent post image" img-class="w-full h-full object-cover" />
           </div>
         </div>
       </div>
@@ -452,7 +453,7 @@ watch(
             </div>
 
             <div v-if="replyImageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
-              <img :src="replyImageUrl" alt="Preview" class="w-full h-full object-cover" />
+              <ImageLightbox :src="replyImageUrl" alt="Preview" img-class="w-full h-full object-cover" />
               <button
                 type="button"
                 @click="clearReplyImage"

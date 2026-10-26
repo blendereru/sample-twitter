@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth';
 import { createPost } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
+import ImageLightbox from '@/components/common/ImageLightbox.vue';
 
 const emit = defineEmits<{
   (e: 'post', post: { id: number; text?: string; imageUrl?: string }): void;
@@ -132,7 +133,7 @@ async function handlePost() {
         </div>
 
         <div v-if="imageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
-          <img :src="imageUrl" alt="Preview" class="w-full h-full object-cover" />
+          <ImageLightbox :src="imageUrl" alt="Preview" img-class="w-full h-full object-cover" />
           <button
             type="button"
             @click="clearImage"

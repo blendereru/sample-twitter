@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 import { editPost, deletePost, repostPost, undoRepost } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
+import ImageLightbox from '@/components/common/ImageLightbox.vue';
 import type { RepostResponse } from '@/types/api';
 
 const props = defineProps<{
@@ -589,7 +590,7 @@ async function handleSave() {
         </div>
 
         <div v-if="editImageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
-          <img :src="editImageUrl" alt="Preview" class="w-full h-full object-cover" />
+          <ImageLightbox :src="editImageUrl" alt="Preview" img-class="w-full h-full object-cover" />
           <button
             type="button"
             @click="clearEditImage"
@@ -654,7 +655,7 @@ async function handleSave() {
         >{{ content }}</p>
 
         <div v-if="imageUrl" class="mt-2 rounded-2xl overflow-hidden border border-neutral-800 max-h-96">
-          <img :src="imageUrl" alt="Attachment" class="w-full h-full object-cover" />
+          <ImageLightbox :src="imageUrl" alt="Attachment" img-class="w-full h-full object-cover" />
         </div>
 
         <!-- Full timestamp row when focused (X style) -->

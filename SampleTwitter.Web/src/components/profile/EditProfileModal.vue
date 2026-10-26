@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { X, Loader2, User, Mail, Lock, CheckCircle2, Upload } from 'lucide-vue-next';
 import InputField from '@/components/common/InputField.vue';
 import AlertBanner from '@/components/common/AlertBanner.vue';
+import ImageLightbox from '@/components/common/ImageLightbox.vue';
 import { editProfile } from '@/api/users';
 import { changeEmail, changePassword } from '@/api/account';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
@@ -350,11 +351,11 @@ async function handleSavePassword() {
           <!-- Avatar Preview & Upload -->
           <div class="flex items-center justify-between gap-4 pb-2">
             <div class="flex items-center gap-4">
-              <img
+              <ImageLightbox
                 v-if="imageUrl.trim()"
                 :src="imageUrl.trim()"
                 alt="Avatar preview"
-                class="w-16 h-16 rounded-full object-cover border-2 border-neutral-700 bg-neutral-900 shrink-0"
+                img-class="w-16 h-16 rounded-full object-cover border-2 border-neutral-700 bg-neutral-900 shrink-0"
               />
               <div
                 v-else

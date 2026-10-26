@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import EditProfileModal from '@/components/profile/EditProfileModal.vue';
+import ImageLightbox from '@/components/common/ImageLightbox.vue';
 import { getUser, getUserPosts, getUserReplies } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
@@ -124,6 +125,12 @@ function formatDate(dateStr: string): string {
 }
 
 function getAvatar(userId: number): string {
+  if (userId === targetUserId.value && userInfo.value?.imageUrl) {
+    return userInfo.value.imageUrl;
+  }
+  if (authStore.currentUserId && Number(authStore.currentUserId) === userId && authStore.currentUserImageUrl) {
+    return authStore.currentUserImageUrl;
+  }
   return userId % 2 === 0
     ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
     : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80';
@@ -328,10 +335,10 @@ watch(
         <!-- Avatar & Profile Action -->
         <div class="px-4 pb-4">
           <div class="flex justify-between items-end relative -mt-16 sm:-mt-20 mb-4">
-            <img
+            <ImageLightbox
               :src="profileAvatar"
               alt="Profile Avatar"
-              class="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-black object-cover bg-neutral-800 shadow-xl"
+              img-class="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-black object-cover bg-neutral-800 shadow-xl"
             />
 
             <div class="mt-2">
@@ -594,7 +601,11 @@ watch(
                 </p>
 
                 <div v-if="reply.parentPost.imageUrl" class="mt-2 rounded-2xl overflow-hidden border border-neutral-800 max-h-60 max-w-md">
-                  <img :src="reply.parentPost.imageUrl" alt="Parent post image" class="w-full h-full object-cover" />
+                  <ImageLightbox
+                    :src="reply.parentPost.imageUrl"
+                    alt="Parent post image"
+                    img-class="w-full h-full object-cover"
+                  />
                 </div>
               </div>
             </div>
