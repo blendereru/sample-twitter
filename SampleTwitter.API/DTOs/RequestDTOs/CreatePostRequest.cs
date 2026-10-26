@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.DTOs.RequestDTOs;
 
@@ -7,7 +8,7 @@ namespace SampleTwitter.API.DTOs.RequestDTOs;
 /// </summary>
 public class CreatePostRequest
 {
-    [MaxLength(280)]
+    [MaxLength(Post.MaxTextLength)]
     public string? Text { get; set; }
 
     [Url]

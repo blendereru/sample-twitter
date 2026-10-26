@@ -18,7 +18,7 @@ public class ApplicationContext : DbContext
         modelBuilder.Entity<User>(builder =>
         {
             builder.HasIndex(u => u.Email).IsUnique();
-            builder.Property(u => u.Username).HasMaxLength(50);
+            builder.Property(u => u.Username).HasMaxLength(User.MaxUsernameLength);
         });
 
         modelBuilder.Entity<Repost>(builder =>
@@ -78,7 +78,7 @@ public class ApplicationContext : DbContext
             builder.HasIndex(p => new { p.UserId, p.CreatedAt });
             builder.HasIndex(p => p.ReplyId);
 
-            builder.Property(p => p.Text).HasMaxLength(280);
+            builder.Property(p => p.Text).HasMaxLength(Post.MaxTextLength);
 
             builder.HasQueryFilter(p => !p.IsDeleted);
         });

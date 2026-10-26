@@ -255,14 +255,12 @@ public class ForgotPasswordTests : IntegrationTestBase
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-            db.PasswordResetTokens.Add(new PasswordResetToken
-            {
-                UserId = user.Id,
-                TokenHash = "already-used-token-hash",
-                CreatedAt = DateTimeOffset.UtcNow.AddHours(-2),
-                ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1),
-                UsedAt = DateTimeOffset.UtcNow.AddMinutes(-90)
-            });
+            var usedToken = PasswordResetToken.Create(
+                user.Id,
+                "already-used-token-hash",
+                DateTimeOffset.UtcNow.AddHours(-2));
+            usedToken.MarkUsed(DateTimeOffset.UtcNow.AddMinutes(-90));
+            db.PasswordResetTokens.Add(usedToken);
             await db.SaveChangesAsync();
         }
 

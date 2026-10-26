@@ -22,31 +22,19 @@ public class PostService : IPostService
 
     public async Task<CreatePostResult> Create(CreatePostRequest request, long userId, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
-        {
-            throw new EmptyPostException("User attempted to create a post with no text and no image.");
-        }
+        var post = Post.Create(userId, request.Text, request.ImageUrl, request.ReplyId);
 
-        if (request.ReplyId is not null)
+        if (post.ReplyId is not null)
         {
             var parentExists = await _applicationContext.Posts
-                .AnyAsync(p => p.Id == request.ReplyId, ct);
+                .AnyAsync(p => p.Id == post.ReplyId, ct);
 
             if (!parentExists)
             {
-                _logger.LogWarning("Reply target post {ReplyId} not found", request.ReplyId);
-                throw new PostNotFoundException($"Post with id {request.ReplyId} was not found.");
+                _logger.LogWarning("Reply target post {ReplyId} not found", post.ReplyId);
+                throw new PostNotFoundException($"Post with id {post.ReplyId} was not found.");
             }
         }
-
-        var post = new Post
-        {
-            Text = request.Text?.Trim(),
-            ImageUrl = request.ImageUrl,
-            ReplyId = request.ReplyId,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UserId = userId
-        };
 
         _applicationContext.Posts.Add(post);
         await _applicationContext.SaveChangesAsync(ct);
@@ -64,11 +52,6 @@ public class PostService : IPostService
 
     public async Task<EditPostResult> Edit(long postId, EditPostRequest request, long userId, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Text) && string.IsNullOrWhiteSpace(request.ImageUrl))
-        {
-            throw new EmptyPostException("User attempted to edit a post to have no text and no image.");
-        }
-
         var post = await _applicationContext.Posts
             .SingleOrDefaultAsync(p => p.Id == postId, ct);
 
@@ -78,15 +61,7 @@ public class PostService : IPostService
             throw new PostNotFoundException($"Post with id {postId} was not found.");
         }
 
-        if (post.UserId != userId)
-        {
-            _logger.LogWarning("Edit forbidden — user {UserId} does not own post {PostId}", userId, postId);
-            throw new ForbiddenException($"User {userId} attempted to edit post {postId} owned by user {post.UserId}.");
-        }
-
-        post.Text = request.Text?.Trim();
-        post.ImageUrl = request.ImageUrl;
-        post.UpdatedAt = DateTimeOffset.UtcNow;
+        post.Edit(userId, request.Text, request.ImageUrl);
 
         await _applicationContext.SaveChangesAsync(ct);
 
@@ -139,14 +114,8 @@ public class PostService : IPostService
             throw new PostNotFoundException($"Post with id {postId} was not found.");
         }
 
-        if (post.UserId != userId)
-        {
-            _logger.LogWarning("Delete forbidden — user {UserId} does not own post {PostId}", userId, postId);
-            throw new ForbiddenException($"User {userId} attempted to delete post {postId} owned by user {post.UserId}.");
-        }
+        post.Delete(userId);
 
-        post.IsDeleted = true;
-        post.DeletedAt = DateTimeOffset.UtcNow;
         await _applicationContext.SaveChangesAsync(ct);
 
         _logger.LogInformation("Post {PostId} deleted by user {UserId}", post.Id, userId);
@@ -181,12 +150,7 @@ public class PostService : IPostService
             throw new AlreadyRepostedException($"User {userId} has already reposted post {postId}.");
         }
 
-        var repost = new Repost
-        {
-            PostId = postId,
-            UserId = userId,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
+        var repost = Models.Repost.Create(postId, userId);
 
         _applicationContext.Reposts.Add(repost);
 

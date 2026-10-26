@@ -16,7 +16,6 @@ public class EmailConfirmationService : IEmailConfirmationService
     private readonly IEmailSender _emailSender;
     private readonly AppOptions _options;
     private readonly ILogger<EmailConfirmationService> _logger;
-    private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(24);
 
     public EmailConfirmationService(ApplicationContext applicationContext, ISecureTokenGenerator tokenGenerator,
         IEmailSender emailSender, IOptions<AppOptions> options, ILogger<EmailConfirmationService> logger)
@@ -47,13 +46,7 @@ public class EmailConfirmationService : IEmailConfirmationService
         _applicationContext.EmailConfirmationTokens.RemoveRange(oldTokens);
 
         var rawToken = _tokenGenerator.Generate();
-        var tokenEntity = new EmailConfirmationToken
-        {
-            UserId = userId,
-            TokenHash = _tokenGenerator.Hash(rawToken),
-            ExpiresAt = DateTimeOffset.UtcNow.Add(TokenLifetime),
-            CreatedAt = DateTimeOffset.UtcNow
-        };
+        var tokenEntity = EmailConfirmationToken.Create(userId, _tokenGenerator.Hash(rawToken));
 
         _applicationContext.EmailConfirmationTokens.Add(tokenEntity);
         await _applicationContext.SaveChangesAsync(ct);
@@ -88,14 +81,14 @@ public class EmailConfirmationService : IEmailConfirmationService
             .Include(t => t.User)
             .SingleOrDefaultAsync(t => t.UserId == userId && t.TokenHash == tokenHash, ct);
 
-        if (tokenEntity is null || tokenEntity.UsedAt is not null || tokenEntity.ExpiresAt < DateTimeOffset.UtcNow)
+        if (tokenEntity is null || !tokenEntity.IsValid())
         {
             _logger.LogWarning("Invalid or expired confirmation attempt for user {UserId}", userId);
             throw new InvalidTokenException("This confirmation link is invalid or has expired.");
         }
 
-        tokenEntity.User.EmailConfirmed = true;
-        tokenEntity.UsedAt = DateTimeOffset.UtcNow;
+        tokenEntity.MarkUsed();
+        tokenEntity.User.ConfirmEmail();
 
         await _applicationContext.SaveChangesAsync(ct);
 

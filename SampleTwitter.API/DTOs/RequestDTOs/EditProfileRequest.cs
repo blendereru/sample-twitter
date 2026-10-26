@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.DTOs.RequestDTOs;
 
@@ -7,7 +8,7 @@ namespace SampleTwitter.API.DTOs.RequestDTOs;
 /// </summary>
 public class EditProfileRequest
 {
-    [MaxLength(50)]
+    [MaxLength(User.MaxUsernameLength)]
     public string? Username { get; set; }
 
     [Url]

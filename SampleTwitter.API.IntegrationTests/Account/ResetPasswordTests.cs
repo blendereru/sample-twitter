@@ -175,8 +175,7 @@ public class ResetPasswordTests : IntegrationTestBase
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
             var dbUser = await db.Users.SingleAsync(u => u.Id == user.Id);
-            dbUser.Username = "KeptUsername";
-            dbUser.ImageUrl = "https://example.com/kept.png";
+            dbUser.UpdateProfile("KeptUsername", "https://example.com/kept.png");
             await db.SaveChangesAsync();
         }
 
@@ -417,13 +416,9 @@ public class ResetPasswordTests : IntegrationTestBase
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-            db.PasswordResetTokens.Add(new PasswordResetToken
-            {
-                UserId = user.Id,
-                TokenHash = ComputeTokenHash(rawToken),
-                ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
-                CreatedAt = DateTimeOffset.UtcNow
-            });
+            db.PasswordResetTokens.Add(PasswordResetToken.Create(
+                user.Id,
+                ComputeTokenHash(rawToken)));
             await db.SaveChangesAsync();
         }
 
@@ -474,14 +469,14 @@ public class ResetPasswordTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        db.PasswordResetTokens.Add(new PasswordResetToken
+        var createdAt = expiresAt.Subtract(PasswordResetToken.DefaultLifetime);
+        var token = PasswordResetToken.Create(user.Id, ComputeTokenHash(rawToken), createdAt);
+        if (usedAt is not null)
         {
-            UserId = user.Id,
-            TokenHash = ComputeTokenHash(rawToken),
-            ExpiresAt = expiresAt,
-            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-15),
-            UsedAt = usedAt
-        });
+            token.MarkUsed(usedAt);
+        }
+
+        db.PasswordResetTokens.Add(token);
         await db.SaveChangesAsync();
 
         return (user, rawToken);

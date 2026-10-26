@@ -75,8 +75,7 @@ public class ChangeEmailTests : IntegrationTestBase
         {
             var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
             var dbUser = await db.Users.SingleAsync(u => u.Id == user.Id);
-            dbUser.Username = "Alice";
-            dbUser.ImageUrl = "https://example.com/alice.png";
+            dbUser.UpdateProfile("Alice", "https://example.com/alice.png");
             await db.SaveChangesAsync();
         }
 

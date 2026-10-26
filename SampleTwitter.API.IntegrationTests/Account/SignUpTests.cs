@@ -270,13 +270,9 @@ public class SignUpTests : IntegrationTestBase
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        db.Users.Add(new User
-        {
-            Email = email,
-            PasswordHash = passwordHash,
-            EmailConfirmed = true,
-            RegisteredAt = DateTimeOffset.UtcNow.AddDays(-5)
-        });
+        var user = User.Register(email, passwordHash, DateTimeOffset.UtcNow.AddDays(-5));
+        user.ConfirmEmail();
+        db.Users.Add(user);
         await db.SaveChangesAsync();
     }
 
@@ -284,13 +280,7 @@ public class SignUpTests : IntegrationTestBase
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        db.Users.Add(new User
-        {
-            Email = email,
-            PasswordHash = passwordHash,
-            EmailConfirmed = false,
-            RegisteredAt = DateTimeOffset.UtcNow.AddDays(-1)
-        });
+        db.Users.Add(User.Register(email, passwordHash, DateTimeOffset.UtcNow.AddDays(-1)));
         await db.SaveChangesAsync();
     }
 

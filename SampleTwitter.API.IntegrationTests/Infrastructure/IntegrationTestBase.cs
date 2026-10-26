@@ -43,13 +43,12 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-        var user = new User
+        var user = User.Register(email, hasher.Hash(password));
+        if (emailConfirmed)
         {
-            Email = email,
-            PasswordHash = hasher.Hash(password),
-            EmailConfirmed = emailConfirmed,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
+            user.ConfirmEmail();
+        }
+
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;
@@ -82,15 +81,12 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        var post = new Post
+        var post = Post.Create(userId, text, imageUrl, replyId, createdAt);
+        if (updatedAt is not null)
         {
-            Text = text,
-            ImageUrl = imageUrl,
-            ReplyId = replyId,
-            UserId = userId,
-            CreatedAt = createdAt ?? DateTimeOffset.UtcNow,
-            UpdatedAt = updatedAt
-        };
+            post.Edit(userId, text, imageUrl, updatedAt);
+        }
+
         db.Posts.Add(post);
         await db.SaveChangesAsync();
         return post;
@@ -106,12 +102,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        var repost = new Repost
-        {
-            PostId = postId,
-            UserId = userId,
-            CreatedAt = createdAt ?? DateTimeOffset.UtcNow
-        };
+        var repost = Repost.Create(postId, userId, createdAt);
         db.Reposts.Add(repost);
         await db.SaveChangesAsync();
         return repost;

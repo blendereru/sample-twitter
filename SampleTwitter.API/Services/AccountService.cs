@@ -21,7 +21,6 @@ public class AccountService : IAccountService
     private readonly IEmailSender _emailSender;
     private readonly AppOptions _options;
     private readonly ILogger<AccountService> _logger;
-    private static readonly TimeSpan PasswordResetTokenLifetime = TimeSpan.FromHours(1);
 
     public AccountService(
         ApplicationContext applicationContext,
@@ -43,7 +42,7 @@ public class AccountService : IAccountService
 
     public async Task<RegisterResult> Register(SignUpRequest request, CancellationToken ct = default)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedEmail = User.NormalizeEmail(request.Email);
 
         using var _ = LogContext.PushProperty("Email", normalizedEmail);
 
@@ -54,31 +53,19 @@ public class AccountService : IAccountService
 
         if (existingUser is not null)
         {
-            if (existingUser.EmailConfirmed)
-            {
-                _logger.LogWarning("Registration rejected — email already confirmed");
-                throw new ConflictException($"User with email {normalizedEmail} already exists and is confirmed.");
-            }
+            existingUser.RenewRegistration(_passwordHasher.Hash(request.Password));
 
             _logger.LogInformation(
                 "Existing unconfirmed registration found for user {UserId} — resending confirmation",
                 existingUser.Id);
 
-            existingUser.RegisteredAt = DateTimeOffset.UtcNow;
-            existingUser.PasswordHash = _passwordHasher.Hash(request.Password);
             await _applicationContext.SaveChangesAsync(ct);
             await _emailConfirmationService.SendConfirmationEmail(existingUser.Id, existingUser.Email, ct);
 
             return new RegisterResult(existingUser.Id, existingUser.Email, IsNewRegistration: false);
         }
 
-        var user = new User
-        {
-            Email = normalizedEmail,
-            PasswordHash = _passwordHasher.Hash(request.Password),
-            EmailConfirmed = false,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
+        var user = User.Register(normalizedEmail, _passwordHasher.Hash(request.Password));
 
         _applicationContext.Users.Add(user);
 
@@ -101,7 +88,7 @@ public class AccountService : IAccountService
 
     public async Task<LoginResult> Login(LoginRequest request, CancellationToken ct = default)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedEmail = User.NormalizeEmail(request.Email);
 
         using var _ = LogContext.PushProperty("Email", normalizedEmail);
 
@@ -122,11 +109,7 @@ public class AccountService : IAccountService
             throw new InvalidCredentialsException($"Invalid password for user {user.Id}.");
         }
 
-        if (!user.EmailConfirmed)
-        {
-            _logger.LogWarning("Login failed — email not confirmed for user {UserId}", user.Id);
-            throw new EmailNotConfirmedException($"User {user.Id} has not confirmed their email.");
-        }
+        user.EnsureCanSignIn();
 
         _logger.LogInformation("User {UserId} authenticated successfully", user.Id);
 
@@ -150,11 +133,6 @@ public class AccountService : IAccountService
 
     public async Task<EditProfileResult> Edit(long id, EditProfileRequest request, long currentUserId, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Username) && string.IsNullOrWhiteSpace(request.ImageUrl))
-        {
-            throw new EmptyProfileException("User attempted to edit profile to have no username and no image.");
-        }
-
         var user = await _applicationContext.Users
             .SingleOrDefaultAsync(u => u.Id == id, ct);
 
@@ -170,9 +148,7 @@ public class AccountService : IAccountService
             throw new ForbiddenException($"User {currentUserId} attempted to edit profile of user {id}.");
         }
 
-        user.Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim();
-        user.ImageUrl = request.ImageUrl;
-        user.UpdatedAt = DateTimeOffset.UtcNow;
+        user.UpdateProfile(request.Username, request.ImageUrl);
 
         await _applicationContext.SaveChangesAsync(ct);
 
@@ -211,8 +187,7 @@ public class AccountService : IAccountService
             _applicationContext.PasswordResetTokens.RemoveRange(unusedResetTokens);
         }
 
-        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
-        user.UpdatedAt = DateTimeOffset.UtcNow;
+        user.ChangePassword(_passwordHasher.Hash(request.NewPassword));
 
         await _applicationContext.SaveChangesAsync(ct);
 
@@ -221,7 +196,7 @@ public class AccountService : IAccountService
 
     public async Task<ChangeEmailResult> ChangeEmail(long userId, ChangeEmailRequest request, CancellationToken ct = default)
     {
-        var normalizedEmail = request.NewEmail.Trim().ToLowerInvariant();
+        var normalizedEmail = User.NormalizeEmail(request.NewEmail);
 
         var user = await _applicationContext.Users
             .SingleOrDefaultAsync(u => u.Id == userId, ct);
@@ -247,9 +222,7 @@ public class AccountService : IAccountService
             throw new ConflictException($"User with email {normalizedEmail} already exists.");
         }
 
-        user.Email = normalizedEmail;
-        user.EmailConfirmed = false;
-        user.UpdatedAt = DateTimeOffset.UtcNow;
+        user.ChangeEmail(normalizedEmail);
 
         try
         {
@@ -270,7 +243,7 @@ public class AccountService : IAccountService
 
     public async Task ForgotPassword(ForgotPasswordRequest request, CancellationToken ct = default)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedEmail = User.NormalizeEmail(request.Email);
 
         using var _ = LogContext.PushProperty("Email", normalizedEmail);
 
@@ -296,13 +269,7 @@ public class AccountService : IAccountService
         }
 
         var rawToken = _tokenGenerator.Generate();
-        var tokenEntity = new PasswordResetToken
-        {
-            UserId = user.Id,
-            TokenHash = _tokenGenerator.Hash(rawToken),
-            ExpiresAt = DateTimeOffset.UtcNow.Add(PasswordResetTokenLifetime),
-            CreatedAt = DateTimeOffset.UtcNow
-        };
+        var tokenEntity = PasswordResetToken.Create(user.Id, _tokenGenerator.Hash(rawToken));
 
         _applicationContext.PasswordResetTokens.Add(tokenEntity);
         await _applicationContext.SaveChangesAsync(ct);
@@ -338,15 +305,14 @@ public class AccountService : IAccountService
             .Include(t => t.User)
             .SingleOrDefaultAsync(t => t.UserId == request.UserId && t.TokenHash == tokenHash, ct);
 
-        if (tokenEntity is null || tokenEntity.UsedAt is not null || tokenEntity.ExpiresAt < DateTimeOffset.UtcNow)
+        if (tokenEntity is null || !tokenEntity.IsValid())
         {
             _logger.LogWarning("Invalid or expired password reset attempt for user {UserId}", request.UserId);
             throw new InvalidTokenException("This password reset link is invalid or has expired.");
         }
 
-        tokenEntity.User.PasswordHash = _passwordHasher.Hash(request.NewPassword);
-        tokenEntity.User.UpdatedAt = DateTimeOffset.UtcNow;
-        tokenEntity.UsedAt = DateTimeOffset.UtcNow;
+        tokenEntity.MarkUsed();
+        tokenEntity.User.ChangePassword(_passwordHasher.Hash(request.NewPassword));
 
         await _applicationContext.SaveChangesAsync(ct);
 

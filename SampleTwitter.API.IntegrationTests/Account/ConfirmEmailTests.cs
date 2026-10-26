@@ -270,23 +270,13 @@ public class ConfirmEmailTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        var user = new User
-        {
-            Email = email,
-            PasswordHash = "some-hash",
-            EmailConfirmed = false,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
+        var user = User.Register(email, "some-hash");
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        db.EmailConfirmationTokens.Add(new EmailConfirmationToken
-        {
-            UserId = user.Id,
-            TokenHash = ComputeTokenHash(rawToken),
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(24),
-            CreatedAt = DateTimeOffset.UtcNow
-        });
+        db.EmailConfirmationTokens.Add(EmailConfirmationToken.Create(
+            user.Id,
+            ComputeTokenHash(rawToken)));
         await db.SaveChangesAsync();
 
         return (user.Id, rawToken);
@@ -299,24 +289,15 @@ public class ConfirmEmailTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        var user = new User
-        {
-            Email = email,
-            PasswordHash = "some-hash",
-            EmailConfirmed = true,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
+        var user = User.Register(email, "some-hash");
+        user.ConfirmEmail();
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        db.EmailConfirmationTokens.Add(new EmailConfirmationToken
-        {
-            UserId = user.Id,
-            TokenHash = ComputeTokenHash(rawToken),
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(24),
-            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
-            UsedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
-        });
+        var createdAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var token = EmailConfirmationToken.Create(user.Id, ComputeTokenHash(rawToken), createdAt);
+        token.MarkUsed(createdAt);
+        db.EmailConfirmationTokens.Add(token);
         await db.SaveChangesAsync();
 
         return (user.Id, rawToken);
@@ -329,23 +310,14 @@ public class ConfirmEmailTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        var user = new User
-        {
-            Email = email,
-            PasswordHash = "some-hash",
-            EmailConfirmed = false,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
+        var user = User.Register(email, "some-hash");
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        db.EmailConfirmationTokens.Add(new EmailConfirmationToken
-        {
-            UserId = user.Id,
-            TokenHash = ComputeTokenHash(rawToken),
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(-1),
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-25)
-        });
+        db.EmailConfirmationTokens.Add(EmailConfirmationToken.Create(
+            user.Id,
+            ComputeTokenHash(rawToken),
+            DateTimeOffset.UtcNow.AddHours(-25)));
         await db.SaveChangesAsync();
 
         return (user.Id, rawToken);
