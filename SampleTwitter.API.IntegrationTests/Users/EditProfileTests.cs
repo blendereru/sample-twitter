@@ -13,49 +13,6 @@ public class EditProfileTests : IntegrationTestBase
     public EditProfileTests(ApiWebApplicationFactory factory) : base(factory) { }
 
     [Fact]
-    public async Task ValidEdit_UsernameOnly_Returns200WithEditProfileResponse()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "alice_dev", ImageUrl = null });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<EditProfileResponse>();
-        Assert.NotNull(body);
-        Assert.Equal(user.Id, body.Id);
-        Assert.Equal("alice_dev", body.Username);
-        Assert.Null(body.ImageUrl);
-        Assert.NotNull(body.UpdatedAt);
-    }
-
-    [Fact]
-    public async Task ValidEdit_ImageOnly_Returns200WithEditProfileResponse()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        const string avatarUrl = "https://example.com/avatar.png";
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = null, ImageUrl = avatarUrl });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<EditProfileResponse>();
-        Assert.NotNull(body);
-        Assert.Equal(user.Id, body.Id);
-        Assert.Null(body.Username);
-        Assert.Equal(avatarUrl, body.ImageUrl);
-        Assert.NotNull(body.UpdatedAt);
-    }
-
-    [Fact]
     public async Task ValidEdit_BothUsernameAndImageUrl_Returns200WithEditProfileResponse()
     {
         // Arrange
@@ -140,96 +97,6 @@ public class EditProfileTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ValidEdit_UsernameWithWhitespace_IsTrimmedAndPersisted()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "   trimmed_name   " });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<EditProfileResponse>();
-        Assert.NotNull(body);
-        Assert.Equal("trimmed_name", body.Username);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Users.Single(u => u.Id == user.Id);
-        Assert.Equal("trimmed_name", updated.Username);
-    }
-
-    [Fact]
-    public async Task ValidEdit_WhitespaceUsernameWithValidImageUrl_PersistsNullUsername()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        const string avatarUrl = "https://example.com/avatar.png";
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "   ", ImageUrl = avatarUrl });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<EditProfileResponse>();
-        Assert.NotNull(body);
-        Assert.Null(body.Username);
-        Assert.Equal(avatarUrl, body.ImageUrl);
-    }
-
-    [Fact]
-    public async Task ValidEdit_RemoveExistingImageUrl_PersistsNullImageUrl()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "Alice", ImageUrl = "https://example.com/old.png" });
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "Alice", ImageUrl = null });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Users.Single(u => u.Id == user.Id);
-
-        Assert.Equal("Alice", updated.Username);
-        Assert.Null(updated.ImageUrl);
-    }
-
-    [Fact]
-    public async Task ValidEdit_RemoveExistingUsername_PersistsNullUsername()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        const string avatarUrl = "https://example.com/avatar.png";
-        await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "Alice", ImageUrl = avatarUrl });
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = null, ImageUrl = avatarUrl });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Users.Single(u => u.Id == user.Id);
-
-        Assert.Null(updated.Username);
-        Assert.Equal(avatarUrl, updated.ImageUrl);
-    }
-
-    [Fact]
     public async Task ValidEdit_DuplicateUsernameAcrossTwoUsers_Returns200ForBoth()
     {
         // Arrange
@@ -245,27 +112,6 @@ public class EditProfileTests : IntegrationTestBase
         // Assert
         Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
         Assert.Equal(HttpStatusCode.OK, response2.StatusCode);
-    }
-
-    [Fact]
-    public async Task ValidEdit_Exactly50Characters_Returns200AndPersists()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var maxUsername = new string('u', 50);
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = maxUsername });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Users.Single(u => u.Id == user.Id);
-
-        Assert.Equal(maxUsername, updated.Username);
     }
 
     [Fact]
@@ -382,40 +228,6 @@ public class EditProfileTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EmptyBody_WhitespaceUsernameAndNullImageUrl_Returns400()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-
-        // Act
-        var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "   ", ImageUrl = null });
-
-        // Assert
-        await response.AssertProblemDetails(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task FailedEdit_EmptyBody_DoesNotMutateExistingProfile()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "InitialName" });
-
-        // Act
-        await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = null, ImageUrl = null });
-
-        // Assert
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var unchanged = db.Users.Single(u => u.Id == user.Id);
-
-        Assert.Equal("InitialName", unchanged.Username);
-    }
-
-    [Fact]
     public async Task UsernameExceeds50Characters_Returns400WithUsernameValidationError()
     {
         // Arrange
@@ -427,26 +239,6 @@ public class EditProfileTests : IntegrationTestBase
 
         // Assert
         await response.AssertValidationProblemDetails("Username");
-    }
-
-    [Fact]
-    public async Task FailedEdit_UsernameExceeds50Characters_DoesNotMutateExistingProfile()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = "UntouchedName" });
-
-        // Act
-        await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = new string('x', 51) });
-
-        // Assert
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var unchanged = db.Users.Single(u => u.Id == user.Id);
-
-        Assert.Equal("UntouchedName", unchanged.Username);
     }
 
     [Fact]

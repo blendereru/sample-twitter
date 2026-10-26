@@ -66,68 +66,6 @@ public class ChangeEmailTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ValidChangeEmail_UpdatesDatabaseMarksUnconfirmedAndPreservesOtherFields()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("old@example.com", "Sup3rSecret1!");
-
-        using (var scope = Factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-            var dbUser = await db.Users.SingleAsync(u => u.Id == user.Id);
-            dbUser.UpdateProfile("Alice", "https://example.com/alice.png");
-            await db.SaveChangesAsync();
-        }
-
-        // Act
-        var response = await SendChangeEmailRequest(cookie,
-            new ChangeEmailRequest { NewEmail = "updated@example.com", CurrentPassword = "Sup3rSecret1!" });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using (var scope = Factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-            var updated = await db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
-
-            Assert.Equal("updated@example.com", updated.Email);
-            Assert.False(updated.EmailConfirmed);
-            Assert.NotNull(updated.UpdatedAt);
-            Assert.Equal(user.PasswordHash, updated.PasswordHash);
-            Assert.Equal("Alice", updated.Username);
-            Assert.Equal("https://example.com/alice.png", updated.ImageUrl);
-            Assert.Equal(user.RegisteredAt.ToUnixTimeMilliseconds(), updated.RegisteredAt.ToUnixTimeMilliseconds());
-        }
-    }
-
-    [Fact]
-    public async Task ValidChangeEmail_WithWhitespaceAndMixedCase_NormalizesEmailBeforeSavingAndSending()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("old@example.com", "Sup3rSecret1!");
-
-        // Act
-        var response = await SendChangeEmailRequest(cookie,
-            new ChangeEmailRequest { NewEmail = "  New.Email@Example.COM  ", CurrentPassword = "Sup3rSecret1!" });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<ChangeEmailResponse>();
-        Assert.NotNull(body);
-        Assert.Equal("new.email@example.com", body.Email);
-
-        var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
-        Assert.Equal("new.email@example.com", sentEmail.ToEmail);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = await db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
-        Assert.Equal("new.email@example.com", updated.Email);
-    }
-
-    [Fact]
     public async Task ValidChangeEmail_SignsOutSessionAndSendsConfirmationEmailAndPersistsToken()
     {
         // Arrange

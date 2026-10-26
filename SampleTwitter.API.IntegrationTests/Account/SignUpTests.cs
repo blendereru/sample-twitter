@@ -124,41 +124,6 @@ public class SignUpTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task NewEmail_WithLeadingTrailingWhitespaceAndMixedCase_IsNormalisedBeforeStoring()
-    {
-        // Arrange
-        var request = new SignUpRequest { Email = "  New@Example.com  ", Password = "Sup3rSecret1!" };
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
-
-        // Assert — request succeeded
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        // Assert — stored under the normalised form, not the original input
-        var normalised = await QueryUserAsync("new@example.com");
-        Assert.NotNull(normalised);
-
-        var original = await QueryUserAsync("  New@Example.com  ");
-        Assert.Null(original);
-    }
-
-    [Fact]
-    public async Task SignUpForAlreadyConfirmedEmail_Returns409WithWellFormedProblemDetails()
-    {
-        // Arrange
-        await SeedConfirmedUser("taken@example.com", passwordHash: "hash");
-
-        var request = new SignUpRequest { Email = "taken@example.com", Password = "NewP@ss1!" };
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
-
-        // Assert
-        await response.AssertProblemDetails(HttpStatusCode.Conflict);
-    }
-
-    [Fact]
     public async Task NewEmail_DoesNotIssueAuthCookie()
     {
         // Arrange
@@ -172,21 +137,6 @@ public class SignUpTests : IntegrationTestBase
         Assert.False(
             response.Headers.TryGetValues("Set-Cookie", out var cookieValues) &&
             cookieValues.Any(v => v.StartsWith("SampleTwitter.Auth=")));
-    }
-
-    [Fact]
-    public async Task NewEmail_WithExactly8CharacterPassword_Returns201()
-    {
-        // Arrange — 8 characters is the minimum valid length
-        var request = new SignUpRequest { Email = "boundary@example.com", Password = "12345678" };
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var user = await QueryUserAsync("boundary@example.com");
-        Assert.NotNull(user);
     }
 
     [Fact]

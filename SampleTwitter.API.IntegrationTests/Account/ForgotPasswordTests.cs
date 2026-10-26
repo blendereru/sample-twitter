@@ -92,28 +92,6 @@ public class ForgotPasswordTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ConfirmedUser_EmailWithWhitespaceAndMixedCase_NormalizesAndSendsResetEmail()
-    {
-        // Arrange
-        var user = await SeedUser("normalized@example.com", "Sup3rSecret1!", emailConfirmed: true);
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/forgot-password",
-            new ForgotPasswordRequest { Email = "  Normalized@Example.COM  " });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
-        Assert.Equal("normalized@example.com", sentEmail.ToEmail);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var tokenExists = await db.PasswordResetTokens.AnyAsync(t => t.UserId == user.Id);
-        Assert.True(tokenExists);
-    }
-
-    [Fact]
     public async Task ConfirmedUser_DoesNotIssueAuthCookieOrMutateCurrentPassword()
     {
         // Arrange

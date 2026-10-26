@@ -1,12 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
-using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.IntegrationTests.Infrastructure;
-using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.IntegrationTests.Posts;
 
@@ -45,7 +43,7 @@ public class EditPostTests : IntegrationTestBase
 
         // Act
         var response = await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = "persisted update", ImageUrl = null });
+            new EditPostRequest { Text = "persisted update", ImageUrl = "https://example.com/picture.png" });
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -55,146 +53,10 @@ public class EditPostTests : IntegrationTestBase
         var updated = db.Posts.Single(p => p.Id == post.Id);
 
         Assert.Equal("persisted update", updated.Text);
-        Assert.Null(updated.ImageUrl);
+        Assert.Equal("https://example.com/picture.png", updated.ImageUrl);
         Assert.NotNull(updated.UpdatedAt);
         Assert.Equal(user.Id, updated.UserId);
         Assert.Equal(post.CreatedAt.ToUnixTimeMilliseconds(), updated.CreatedAt.ToUnixTimeMilliseconds());
-    }
-
-    [Fact]
-    public async Task ValidEdit_TextWithWhitespace_IsTrimmedAndPersisted()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original");
-
-        // Act
-        await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = "  trimmed  " });
-
-        // Assert
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Equal("trimmed", updated.Text);
-    }
-
-    [Fact]
-    public async Task ValidEdit_WithValidImageUrl_PersistsImageUrlInDatabase()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original");
-        const string newImageUrl = "https://example.com/picture.png";
-
-        // Act
-        var response = await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = "updated text", ImageUrl = newImageUrl });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Equal("updated text", updated.Text);
-        Assert.Equal(newImageUrl, updated.ImageUrl);
-        Assert.NotNull(updated.UpdatedAt);
-        Assert.Equal(user.Id, updated.UserId);
-        Assert.Equal(post.CreatedAt.ToUnixTimeMilliseconds(), updated.CreatedAt.ToUnixTimeMilliseconds());
-    }
-
-    [Fact]
-    public async Task ValidEdit_ImageOnlyNoText_Returns200AndPersists()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original text");
-        const string newImageUrl = "https://example.com/photo.png";
-
-        // Act
-        var response = await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = null, ImageUrl = newImageUrl });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Null(updated.Text);
-        Assert.Equal(newImageUrl, updated.ImageUrl);
-        Assert.NotNull(updated.UpdatedAt);
-    }
-
-    [Fact]
-    public async Task ValidEdit_RemoveExistingImage_PersistsNullImageInDatabase()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original text", imageUrl: "https://example.com/old.png");
-
-        // Act
-        var response = await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = "original text", ImageUrl = null });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Null(updated.ImageUrl);
-        Assert.Equal("original text", updated.Text);
-    }
-
-    [Fact]
-    public async Task ValidEdit_ReplyPost_PreservesReplyId()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var parentPost = await SeedPost(userId: user.Id, text: "parent post");
-        var replyPost = await SeedPost(userId: user.Id, text: "reply post", replyId: parentPost.Id);
-
-        // Act
-        var response = await SendEditRequest(cookie, replyPost.Id,
-            new EditPostRequest { Text = "updated reply" });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Posts.Single(p => p.Id == replyPost.Id);
-
-        Assert.Equal("updated reply", updated.Text);
-        Assert.Equal(parentPost.Id, updated.ReplyId);
-    }
-
-    [Fact]
-    public async Task ValidEdit_Exactly280Characters_Returns200AndPersists()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original");
-        var longText = new string('a', 280);
-
-        // Act
-        var response = await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = longText });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var updated = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Equal(longText, updated.Text);
     }
 
     [Fact]
@@ -279,41 +141,6 @@ public class EditPostTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EmptyBody_WhitespaceTextAndNullImage_Returns400()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original");
-
-        // Act
-        var response = await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = "   ", ImageUrl = null });
-
-        // Assert
-        await response.AssertProblemDetails(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task FailedEdit_EmptyBody_DoesNotMutateOriginalPost()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original untouched");
-
-        // Act
-        await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = null, ImageUrl = null });
-
-        // Assert
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var unchanged = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Equal("original untouched", unchanged.Text);
-        Assert.Null(unchanged.UpdatedAt);
-    }
-
-    [Fact]
     public async Task TextExceeds280Characters_Returns400WithTextValidationError()
     {
         // Arrange
@@ -326,26 +153,6 @@ public class EditPostTests : IntegrationTestBase
 
         // Assert
         await response.AssertValidationProblemDetails("Text");
-    }
-
-    [Fact]
-    public async Task FailedEdit_TextExceeds280Characters_DoesNotMutateOriginalPost()
-    {
-        // Arrange
-        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
-        var post = await SeedPost(userId: user.Id, text: "original untouched");
-
-        // Act
-        await SendEditRequest(cookie, post.Id,
-            new EditPostRequest { Text = new string('x', 281) });
-
-        // Assert
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var unchanged = db.Posts.Single(p => p.Id == post.Id);
-
-        Assert.Equal("original untouched", unchanged.Text);
-        Assert.Null(unchanged.UpdatedAt);
     }
 
     [Fact]

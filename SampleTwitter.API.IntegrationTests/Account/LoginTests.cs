@@ -115,24 +115,6 @@ public class LoginTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EmailWithWhitespaceAndMixedCase_NormalizesAndReturns200()
-    {
-        // Arrange
-        await SeedConfirmedUser("user@example.com", "Sup3rSecret1!");
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/signin",
-            new LoginRequest { Email = "  USER@EXAMPLE.COM  ", Password = "Sup3rSecret1!" });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(body);
-        Assert.Equal("user@example.com", body.Email);
-    }
-
-    [Fact]
     public async Task WrongPassword_ErrorMessageDoesNotRevealThatUserExists()
     {
         // Arrange

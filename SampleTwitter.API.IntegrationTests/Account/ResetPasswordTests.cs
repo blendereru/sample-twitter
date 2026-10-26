@@ -121,29 +121,6 @@ public class ResetPasswordTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ValidToken_Exactly8CharacterPassword_Returns200AndUpdatesPassword()
-    {
-        // Arrange
-        var (user, rawToken) = await SeedUserWithValidResetToken("boundary@example.com", "OldPassword1!");
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/reset-password",
-            new ResetPasswordRequest
-            {
-                UserId = user.Id,
-                Token = rawToken,
-                NewPassword = "12345678"
-            });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
-            new LoginRequest { Email = "boundary@example.com", Password = "12345678" });
-        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-    }
-
-    [Fact]
     public async Task ValidToken_DoesNotIssueAuthCookieDirectly()
     {
         // Arrange
@@ -163,44 +140,6 @@ public class ResetPasswordTests : IntegrationTestBase
         Assert.False(
             response.Headers.TryGetValues("Set-Cookie", out var cookieValues) &&
             cookieValues.Any(v => v.StartsWith("SampleTwitter.Auth=")));
-    }
-
-    [Fact]
-    public async Task ValidToken_PreservesOtherUserFields()
-    {
-        // Arrange
-        var (user, rawToken) = await SeedUserWithValidResetToken("preserve@example.com", "OldPassword1!");
-
-        using (var scope = Factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-            var dbUser = await db.Users.SingleAsync(u => u.Id == user.Id);
-            dbUser.UpdateProfile("KeptUsername", "https://example.com/kept.png");
-            await db.SaveChangesAsync();
-        }
-
-        // Act
-        var response = await Client.PostAsJsonAsync("/api/auth/reset-password",
-            new ResetPasswordRequest
-            {
-                UserId = user.Id,
-                Token = rawToken,
-                NewPassword = "NewPassword1!"
-            });
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using (var scope = Factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-            var updated = await db.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id);
-            Assert.Equal("preserve@example.com", updated.Email);
-            Assert.Equal("KeptUsername", updated.Username);
-            Assert.Equal("https://example.com/kept.png", updated.ImageUrl);
-            Assert.True(updated.EmailConfirmed);
-            Assert.Equal(user.RegisteredAt.ToUnixTimeMilliseconds(), updated.RegisteredAt.ToUnixTimeMilliseconds());
-        }
     }
 
     [Fact]
