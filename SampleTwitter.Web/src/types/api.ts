@@ -202,3 +202,8 @@ export interface ResendConfirmationEmailRequest {
 export interface ResendConfirmationEmailResponse {
   message: string;
 }
+
+
+export interface SignOutResponse {
+  message: string;
+}

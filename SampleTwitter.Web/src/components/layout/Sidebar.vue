@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Home, Hash, Bell, Mail, Bookmark, User, Twitter, Feather, LogIn, UserPlus, LogOut } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
+import { Home, Hash, Bell, Mail, Bookmark, User, Twitter, Feather, LogIn, UserPlus, LogOut, Loader2 } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const signingOut = ref(false);
 
 const profilePath = computed(() => {
   return authStore.currentUserId ? `/profile/${authStore.currentUserId}` : '/profile';
@@ -21,9 +22,15 @@ const navItems = computed(() => [
   { name: 'Profile', path: profilePath.value, icon: User },
 ]);
 
-function handleLogout() {
-  authStore.clearAuth();
-  router.push('/login');
+async function handleLogout() {
+  if (signingOut.value) return;
+  signingOut.value = true;
+  try {
+    await authStore.logout();
+    router.push('/login');
+  } finally {
+    signingOut.value = false;
+  }
 }
 </script>
 
@@ -105,10 +112,12 @@ function handleLogout() {
       </router-link>
       <button
         @click="handleLogout"
+        :disabled="signingOut"
         title="Sign out"
-        class="p-2 hover:bg-red-500/10 rounded-full text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
+        class="p-2 hover:bg-red-500/10 rounded-full text-neutral-400 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-50"
       >
-        <LogOut class="w-4 h-4" />
+        <Loader2 v-if="signingOut" class="w-4 h-4 animate-spin" />
+        <LogOut v-else class="w-4 h-4" />
       </button>
     </div>
   </header>

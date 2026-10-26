@@ -7,6 +7,7 @@ import type {
   ResendConfirmationEmailResponse,
   LoginRequest,
   LoginResponse,
+  SignOutResponse,
   MeResponse,
   ChangePasswordRequest,
   ChangePasswordResponse,
@@ -25,6 +26,11 @@ export async function signUp(request: SignUpRequest): Promise<SignUpResponse> {
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>('/auth/signin', request);
+  return response.data;
+}
+
+export async function signOut(): Promise<SignOutResponse> {
+  const response = await apiClient.post<SignOutResponse>('/auth/signout');
   return response.data;
 }
 

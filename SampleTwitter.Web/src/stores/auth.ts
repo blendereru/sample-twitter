@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { getMe } from '@/api/account';
+import { getMe, signOut } from '@/api/account';
 import type { MeResponse } from '@/types/api';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -80,6 +80,16 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('sampletwitter_user_image_url');
   }
 
+  async function logout(): Promise<void> {
+    try {
+      await signOut();
+    } catch {
+      // Even if the server request fails or session is already expired, clear local auth state.
+    } finally {
+      clearAuth();
+    }
+  }
+
   async function fetchCurrentUser(): Promise<MeResponse | null> {
     try {
       const user = await getMe();
@@ -104,6 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
     setAuthenticated,
     updateProfileInfo,
     clearAuth,
+    logout,
     fetchCurrentUser,
   };
 });

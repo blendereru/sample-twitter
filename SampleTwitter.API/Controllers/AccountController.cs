@@ -151,6 +151,28 @@ public class AccountController : ControllerBase
     }
 
     /// <summary>
+    /// Signs out the currently authenticated user by clearing the authentication cookie.
+    /// </summary>
+    /// <response code="200">The user was signed out successfully.</response>
+    /// <response code="401">The request is not authenticated.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpPost("signout")]
+    [ProducesResponseType(typeof(SignOutResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SignOutAccount()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        _logger.LogInformation("User {UserId} signed out", userIdClaim);
+
+        return Ok(new SignOutResponse("Signed out successfully."));
+    }
+
+    /// <summary>
     /// Returns the profile information of the currently authenticated user.
     /// </summary>
     /// <response code="200">The authenticated user's profile information.</response>
