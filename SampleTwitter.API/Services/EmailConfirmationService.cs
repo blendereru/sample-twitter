@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
+using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.Exceptions;
 using SampleTwitter.API.Models;
 using SampleTwitter.API.Options;
 using SampleTwitter.API.Results;
+using Serilog.Context;
 
 namespace SampleTwitter.API.Services;
 
@@ -71,6 +73,25 @@ public class EmailConfirmationService : IEmailConfirmationService
             _logger.LogError(ex, "Failed to deliver confirmation email for user {UserId}", userId);
             throw;
         }
+    }
+
+    public async Task ResendConfirmationEmail(ResendConfirmationEmailRequest request, CancellationToken ct = default)
+    {
+        var normalizedEmail = User.NormalizeEmail(request.Email);
+
+        using var _ = LogContext.PushProperty("Email", normalizedEmail);
+
+        var user = await _applicationContext.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(u => u.Email == normalizedEmail, ct);
+
+        if (user is null || user.EmailConfirmed)
+        {
+            _logger.LogInformation("Resend confirmation email requested for non-existent or already-confirmed account");
+            return;
+        }
+
+        await SendConfirmationEmail(user.Id, user.Email, ct);
     }
 
     public async Task<ConfirmEmailResult> ConfirmEmail(long userId, string token, CancellationToken ct = default)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, Link2, MoreHorizontal, Trash2, UserX, VolumeX, Flag, AlertCircle } from 'lucide-vue-next';
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Image as ImageIcon, MoreHorizontal, Trash2, UserX, VolumeX, Flag, AlertCircle } from 'lucide-vue-next';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
@@ -179,7 +179,6 @@ const menuRef = ref<HTMLElement | null>(null);
 const isEditing = ref(false);
 const editText = ref('');
 const editImageUrl = ref('');
-const showImageInput = ref(false);
 const loading = ref(false);
 const uploadingEditImage = ref(false);
 const error = ref<string | null>(null);
@@ -234,7 +233,6 @@ async function handleEditFileSelect(event: Event) {
   try {
     const res = await uploadImage(file);
     editImageUrl.value = res.url;
-    showImageInput.value = false;
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     error.value = parsed.detail || parsed.message || 'Failed to upload image.';
@@ -245,7 +243,6 @@ async function handleEditFileSelect(event: Event) {
 
 function clearEditImage() {
   editImageUrl.value = '';
-  showImageInput.value = false;
 }
 
 function goToProfile(userId?: number) {
@@ -358,7 +355,6 @@ onUnmounted(() => {
 function startEditing() {
   editText.value = props.content || '';
   editImageUrl.value = props.imageUrl || '';
-  showImageInput.value = false;
   error.value = null;
   isEditing.value = true;
 }
@@ -592,23 +588,6 @@ async function handleSave() {
           <span>Uploading image...</span>
         </div>
 
-        <div v-if="showImageInput" class="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-xl p-2">
-          <input
-            v-model="editImageUrl"
-            type="url"
-            placeholder="Enter image URL"
-            :disabled="loading || uploadingEditImage"
-            class="bg-transparent text-sm text-white placeholder-neutral-500 focus:outline-none w-full"
-          />
-          <button
-            type="button"
-            @click="clearEditImage"
-            class="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
-          >
-            <X class="w-4 h-4" />
-          </button>
-        </div>
-
         <div v-if="editImageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
           <img :src="editImageUrl" alt="Preview" class="w-full h-full object-cover" />
           <button
@@ -631,14 +610,6 @@ async function handleSave() {
               class="p-1.5 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors disabled:opacity-50 cursor-pointer"
             >
               <ImageIcon class="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              @click="showImageInput = !showImageInput"
-              title="Add Image URL"
-              :class="['p-1.5 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors cursor-pointer', showImageInput ? 'bg-sky-500/20 text-white' : '']"
-            >
-              <Link2 class="w-4 h-4" />
             </button>
             <span
               v-if="editText.length > 0"

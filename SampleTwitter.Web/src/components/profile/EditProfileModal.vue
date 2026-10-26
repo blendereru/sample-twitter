@@ -34,7 +34,7 @@ const profileLoading = ref(false);
 const avatarUploading = ref(false);
 const profileError = ref<string | null>(null);
 const profileSuccess = ref<string | null>(null);
-const profileFieldErrors = ref<{ username?: string; imageUrl?: string }>({});
+const profileFieldErrors = ref<{ username?: string }>({});
 const avatarFileInputRef = ref<HTMLInputElement | null>(null);
 
 function triggerAvatarFileInput() {
@@ -50,11 +50,10 @@ async function handleAvatarFileSelect(event: Event) {
 
   profileError.value = null;
   profileSuccess.value = null;
-  profileFieldErrors.value.imageUrl = undefined;
 
   const validationError = validateImageFile(file);
   if (validationError) {
-    profileFieldErrors.value.imageUrl = validationError;
+    profileError.value = validationError;
     return;
   }
 
@@ -78,26 +77,13 @@ function validateProfile(): boolean {
   const trimmedImage = imageUrl.value.trim();
 
   if (!trimmedUsername && !trimmedImage) {
-    profileError.value = 'Please provide at least a display name or a profile image.';
+    profileError.value = 'Please provide at least a display name or upload a profile photo.';
     return false;
   }
 
   if (trimmedUsername.length > 50) {
     profileFieldErrors.value.username = 'Username cannot exceed 50 characters.';
     return false;
-  }
-
-  if (trimmedImage) {
-    try {
-      const parsed = new URL(trimmedImage);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        profileFieldErrors.value.imageUrl = 'The ImageUrl field is not a valid fully-qualified http or https URL.';
-        return false;
-      }
-    } catch {
-      profileFieldErrors.value.imageUrl = 'The ImageUrl field is not a valid fully-qualified http or https URL.';
-      return false;
-    }
   }
 
   return true;
@@ -124,15 +110,11 @@ async function handleSaveProfile() {
     profileSuccess.value = 'Profile updated successfully.';
   } catch (err: unknown) {
     const parsed = parseApiError(err);
-    if (parsed.fieldErrors) {
-      if (parsed.fieldErrors.Username?.length) {
-        profileFieldErrors.value.username = parsed.fieldErrors.Username[0];
-      }
-      if (parsed.fieldErrors.ImageUrl?.length) {
-        profileFieldErrors.value.imageUrl = parsed.fieldErrors.ImageUrl[0];
-      }
-    }
-    if (!parsed.fieldErrors || Object.keys(parsed.fieldErrors).length === 0) {
+    if (parsed.fieldErrors?.Username?.length) {
+      profileFieldErrors.value.username = parsed.fieldErrors.Username[0];
+    } else if (parsed.fieldErrors?.ImageUrl?.length) {
+      profileError.value = parsed.fieldErrors.ImageUrl[0];
+    } else {
       profileError.value = parsed.detail || parsed.message || 'Failed to update profile.';
     }
   } finally {
@@ -381,8 +363,8 @@ async function handleSavePassword() {
                 {{ (username.trim() || currentEmail || 'U')[0] }}
               </div>
               <div class="flex flex-col text-xs text-neutral-400">
-                <span class="font-semibold text-neutral-200">Profile Preview</span>
-                <span>Upload an image or provide an image URL.</span>
+                <span class="font-semibold text-neutral-200">Profile Photo</span>
+                <span>JPG, PNG, GIF, or WEBP (max 5 MB).</span>
               </div>
             </div>
 
@@ -421,16 +403,6 @@ async function handleSavePassword() {
               {{ username.trim().length }} / 50
             </div>
           </div>
-
-          <InputField
-            id="edit-profile-image-url"
-            label="Profile Image URL"
-            type="url"
-            v-model="imageUrl"
-            placeholder="https://example.com/avatar.png"
-            :error="profileFieldErrors.imageUrl"
-            :disabled="profileLoading || avatarUploading"
-          />
 
           <button
             type="submit"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, MessageSquare, Image as ImageIcon, Link2, X } from 'lucide-vue-next';
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, MessageSquare, Image as ImageIcon, X } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import { getPostById, getPostReplies, createPost } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
@@ -29,7 +29,6 @@ const replyTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const replyFileInputRef = ref<HTMLInputElement | null>(null);
 const replyText = ref('');
 const replyImageUrl = ref('');
-const showReplyImageInput = ref(false);
 const submittingReply = ref(false);
 const uploadingReplyImage = ref(false);
 const replySubmitError = ref<string | null>(null);
@@ -64,7 +63,6 @@ async function handleReplyFileSelect(event: Event) {
   try {
     const res = await uploadImage(file);
     replyImageUrl.value = res.url;
-    showReplyImageInput.value = false;
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     replySubmitError.value = parsed.detail || parsed.message || 'Failed to upload image.';
@@ -75,7 +73,6 @@ async function handleReplyFileSelect(event: Event) {
 
 function clearReplyImage() {
   replyImageUrl.value = '';
-  showReplyImageInput.value = false;
 }
 
 function getAvatar(userId: number): string {
@@ -184,7 +181,6 @@ async function handleReplySubmit() {
 
     replyText.value = '';
     replyImageUrl.value = '';
-    showReplyImageInput.value = false;
 
     const updatedReplies = await getPostReplies(post.value.id);
     replies.value = updatedReplies || [];
@@ -455,23 +451,6 @@ watch(
               <span>Uploading image...</span>
             </div>
 
-            <div v-if="showReplyImageInput" class="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-xl p-2">
-              <input
-                v-model="replyImageUrl"
-                type="url"
-                placeholder="Enter image URL (e.g. https://...)"
-                :disabled="submittingReply || uploadingReplyImage"
-                class="bg-transparent text-sm text-white placeholder-neutral-500 focus:outline-none w-full"
-              />
-              <button
-                type="button"
-                @click="clearReplyImage"
-                class="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
-              >
-                <X class="w-4 h-4" />
-              </button>
-            </div>
-
             <div v-if="replyImageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
               <img :src="replyImageUrl" alt="Preview" class="w-full h-full object-cover" />
               <button
@@ -485,25 +464,15 @@ watch(
             </div>
 
             <div class="flex items-center justify-between pt-2 border-t border-neutral-800/80">
-              <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  @click="triggerReplyFileInput"
-                  :disabled="submittingReply || uploadingReplyImage"
-                  title="Upload Image"
-                  class="p-2 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  <ImageIcon class="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  @click="showReplyImageInput = !showReplyImageInput"
-                  title="Add Image URL"
-                  :class="['p-2 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors cursor-pointer', showReplyImageInput ? 'text-white bg-sky-500/20' : '']"
-                >
-                  <Link2 class="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                @click="triggerReplyFileInput"
+                :disabled="submittingReply || uploadingReplyImage"
+                title="Upload Image"
+                class="p-2 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <ImageIcon class="w-4 h-4" />
+              </button>
 
               <div class="flex items-center gap-3">
                 <span

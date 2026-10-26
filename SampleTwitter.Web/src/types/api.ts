@@ -193,3 +193,12 @@ export interface ApiError {
 export interface UploadImageResponse {
   url: string;
 }
+
+
+export interface ResendConfirmationEmailRequest {
+  email: string;
+}
+
+export interface ResendConfirmationEmailResponse {
+  message: string;
+}

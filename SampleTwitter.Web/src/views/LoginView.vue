@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Twitter, Loader2 } from 'lucide-vue-next';
+import { Twitter, Loader2, Mail } from 'lucide-vue-next';
 import InputField from '@/components/common/InputField.vue';
 import AlertBanner from '@/components/common/AlertBanner.vue';
-import { login } from '@/api/account';
+import { login, resendConfirmationEmail } from '@/api/account';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 
@@ -14,6 +14,9 @@ const authStore = useAuthStore();
 const email = ref('');
 const password = ref('');
 const loading = ref(false);
+const resendingConfirmation = ref(false);
+const isUnconfirmedEmail = ref(false);
+const resendSuccessMessage = ref<string | null>(null);
 const globalError = ref<string | null>(null);
 const fieldErrors = ref<{ email?: string; password?: string }>({});
 
@@ -39,6 +42,8 @@ function validateClient(): boolean {
 
 async function handleLogin() {
   globalError.value = null;
+  resendSuccessMessage.value = null;
+  isUnconfirmedEmail.value = false;
   if (!validateClient()) return;
 
   loading.value = true;
@@ -62,13 +67,37 @@ async function handleLogin() {
       }
     }
 
-    if (parsed.status === 401 || parsed.status === 403) {
+    if (parsed.status === 403) {
+      isUnconfirmedEmail.value = true;
+      globalError.value = parsed.detail || parsed.message || 'Please confirm your email address before signing in.';
+    } else if (parsed.status === 401) {
       globalError.value = parsed.detail || parsed.message || 'Authentication failed.';
     } else if (!parsed.fieldErrors || Object.keys(parsed.fieldErrors).length === 0) {
       globalError.value = parsed.detail || parsed.message || 'An error occurred during sign in.';
     }
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleResendConfirmation() {
+  const trimmedEmail = email.value.trim();
+  if (!trimmedEmail || resendingConfirmation.value) return;
+
+  resendingConfirmation.value = true;
+  resendSuccessMessage.value = null;
+
+  try {
+    const res = await resendConfirmationEmail({ email: trimmedEmail });
+    resendSuccessMessage.value =
+      res.message || 'If an unconfirmed account with that email exists, a new confirmation link has been sent.';
+    isUnconfirmedEmail.value = false;
+    globalError.value = null;
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    globalError.value = parsed.detail || parsed.message || 'Failed to resend confirmation email.';
+  } finally {
+    resendingConfirmation.value = false;
   }
 }
 </script>
@@ -83,6 +112,24 @@ async function handleLogin() {
 
       <form @submit.prevent="handleLogin" class="flex flex-col gap-4">
         <AlertBanner v-if="globalError" type="error" :message="globalError" />
+        <AlertBanner v-if="resendSuccessMessage" type="success" :message="resendSuccessMessage" />
+
+        <div
+          v-if="isUnconfirmedEmail"
+          class="bg-neutral-900/70 border border-neutral-800 rounded-2xl p-3.5 flex flex-col gap-2.5 text-xs text-neutral-300"
+        >
+          <span>Didn't receive or lost your confirmation link?</span>
+          <button
+            type="button"
+            @click="handleResendConfirmation"
+            :disabled="resendingConfirmation"
+            class="w-full py-2 px-3 rounded-full bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Loader2 v-if="resendingConfirmation" class="w-3.5 h-3.5 animate-spin" />
+            <Mail v-else class="w-3.5 h-3.5" />
+            <span>{{ resendingConfirmation ? 'Sending confirmation email...' : 'Resend confirmation email' }}</span>
+          </button>
+        </div>
 
         <InputField
           id="login-email"

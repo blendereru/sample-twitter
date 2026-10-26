@@ -3,6 +3,8 @@ import type {
   SignUpRequest,
   SignUpResponse,
   ConfirmEmailResponse,
+  ResendConfirmationEmailRequest,
+  ResendConfirmationEmailResponse,
   LoginRequest,
   LoginResponse,
   MeResponse,
@@ -36,6 +38,16 @@ export async function confirmEmail(userId: number, token: string): Promise<Confi
         token,
       },
     }
+  );
+  return response.data;
+}
+
+export async function resendConfirmationEmail(
+  request: ResendConfirmationEmailRequest
+): Promise<ResendConfirmationEmailResponse> {
+  const response = await apiClient.post<ResendConfirmationEmailResponse>(
+    '/auth/resend-confirmation-email',
+    request
   );
   return response.data;
 }

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Twitter, Loader2, MailCheck } from 'lucide-vue-next';
+import { Twitter, Loader2, MailCheck, Mail } from 'lucide-vue-next';
 import InputField from '@/components/common/InputField.vue';
 import AlertBanner from '@/components/common/AlertBanner.vue';
-import { signUp } from '@/api/account';
+import { signUp, resendConfirmationEmail } from '@/api/account';
 import { parseApiError } from '@/api/client';
 import type { SignUpResponse } from '@/types/api';
 
 const email = ref('');
 const password = ref('');
 const loading = ref(false);
+const resending = ref(false);
+const resendMessage = ref<string | null>(null);
 const globalError = ref<string | null>(null);
 const fieldErrors = ref<{ email?: string; password?: string }>({});
 const successResponse = ref<SignUpResponse | null>(null);
@@ -69,6 +71,21 @@ async function handleSubmit() {
     loading.value = false;
   }
 }
+
+async function handleResend() {
+  if (!email.value.trim() || resending.value) return;
+
+  resending.value = true;
+  resendMessage.value = null;
+  try {
+    const res = await resendConfirmationEmail({ email: email.value.trim() });
+    resendMessage.value = res.message || 'A new confirmation link has been sent to your email.';
+  } catch {
+    resendMessage.value = 'Failed to resend confirmation email. Please try again.';
+  } finally {
+    resending.value = false;
+  }
+}
 </script>
 
 <template>
@@ -89,9 +106,23 @@ async function handleSubmit() {
             {{ successResponse.message }}
           </p>
         </div>
+
+        <AlertBanner v-if="resendMessage" type="success" :message="resendMessage" />
+
+        <button
+          type="button"
+          @click="handleResend"
+          :disabled="resending"
+          class="w-full border border-neutral-700 hover:bg-neutral-900 text-neutral-200 font-semibold py-2.5 rounded-full flex items-center justify-center gap-2 transition-colors text-xs cursor-pointer disabled:opacity-50"
+        >
+          <Loader2 v-if="resending" class="w-3.5 h-3.5 animate-spin" />
+          <Mail v-else class="w-3.5 h-3.5" />
+          <span>{{ resending ? 'Sending...' : 'Resend confirmation email' }}</span>
+        </button>
+
         <router-link
           to="/"
-          class="mt-2 w-full bg-white hover:bg-neutral-200 text-black font-bold py-3 rounded-full text-center transition-colors text-sm"
+          class="w-full bg-white hover:bg-neutral-200 text-black font-bold py-3 rounded-full text-center transition-colors text-sm"
         >
           Return to Home
         </router-link>

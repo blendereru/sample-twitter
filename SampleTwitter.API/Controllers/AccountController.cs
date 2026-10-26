@@ -87,6 +87,27 @@ public class AccountController : ControllerBase
         _logger.LogInformation("User {UserId} confirmed email and signed in", result.UserId);
         return Ok(new ConfirmEmailResponse("Your email has been confirmed. You are now signed in."));
     }
+
+    /// <summary>
+    /// Resends a confirmation email if an unconfirmed account exists for the specified email address.
+    /// Always returns 200 OK to prevent email enumeration.
+    /// </summary>
+    /// <response code="200">If an unconfirmed account with that email exists, a confirmation link has been sent.</response>
+    /// <response code="400">The request body failed validation (e.g. malformed email).</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpPost("resend-confirmation-email")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ResendConfirmationEmailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ResendConfirmationEmail(ResendConfirmationEmailRequest request, CancellationToken ct)
+    {
+        await _emailConfirmationService.ResendConfirmationEmail(request, ct);
+
+        return Ok(new ResendConfirmationEmailResponse(
+            "If an unconfirmed account with that email exists, a new confirmation link has been sent."));
+    }
+
     /// <summary>
     /// Authenticates a user with email and password and issues an authentication cookie.
     /// </summary>

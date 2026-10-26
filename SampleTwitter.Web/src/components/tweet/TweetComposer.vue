@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Image, Link2, Smile, Calendar, MapPin, Loader2, X } from 'lucide-vue-next';
+import { Image, Smile, Calendar, MapPin, Loader2, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { createPost } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
@@ -13,7 +13,6 @@ const emit = defineEmits<{
 const authStore = useAuthStore();
 const content = ref('');
 const imageUrl = ref('');
-const showImageInput = ref(false);
 const loading = ref(false);
 const uploadingImage = ref(false);
 const error = ref<string | null>(null);
@@ -49,7 +48,6 @@ async function handleFileSelect(event: Event) {
   try {
     const res = await uploadImage(file);
     imageUrl.value = res.url;
-    showImageInput.value = false;
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     error.value = parsed.detail || parsed.message || 'Failed to upload image.';
@@ -60,7 +58,6 @@ async function handleFileSelect(event: Event) {
 
 function clearImage() {
   imageUrl.value = '';
-  showImageInput.value = false;
 }
 
 async function handlePost() {
@@ -86,7 +83,6 @@ async function handlePost() {
 
     content.value = '';
     imageUrl.value = '';
-    showImageInput.value = false;
   } catch (err: unknown) {
     const parsed = parseApiError(err);
     if (parsed.fieldErrors?.Text?.length) {
@@ -135,23 +131,6 @@ async function handlePost() {
           <span>Uploading image...</span>
         </div>
 
-        <div v-if="showImageInput" class="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-xl p-2">
-          <input
-            v-model="imageUrl"
-            type="url"
-            placeholder="Enter image URL (e.g. https://...)"
-            :disabled="loading || uploadingImage"
-            class="bg-transparent text-sm text-white placeholder-neutral-500 focus:outline-none w-full"
-          />
-          <button
-            type="button"
-            @click="clearImage"
-            class="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
-          >
-            <X class="w-4 h-4" />
-          </button>
-        </div>
-
         <div v-if="imageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
           <img :src="imageUrl" alt="Preview" class="w-full h-full object-cover" />
           <button
@@ -174,14 +153,6 @@ async function handlePost() {
               class="p-2 hover:bg-sky-500/10 rounded-full transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Image class="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              @click="showImageInput = !showImageInput"
-              title="Add Image URL"
-              :class="['p-2 hover:bg-sky-500/10 rounded-full transition-colors cursor-pointer', showImageInput ? 'text-white bg-sky-500/20' : '']"
-            >
-              <Link2 class="w-4 h-4" />
             </button>
             <button type="button" class="p-2 hover:bg-sky-500/10 rounded-full transition-colors"><Smile class="w-4 h-4" /></button>
             <button type="button" class="p-2 hover:bg-sky-500/10 rounded-full transition-colors"><Calendar class="w-4 h-4" /></button>
