@@ -18,7 +18,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         .WithUsername("test")
         .WithPassword("test")
         .Build();
-    
+
     private Respawner _respawner = null!;
 
     public FakeEmailSender FakeEmailSender { get; } = new();
@@ -27,14 +27,16 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
     public UserInsertBarrierInterceptor RepostInsertBarrier => UserInsertBarrier;
 
+    public UserInsertBarrierInterceptor BookmarkInsertBarrier => UserInsertBarrier;
+
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
-        
+
         using var scope = Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
         await dbContext.Database.MigrateAsync();
-        
+
         await using var connection = dbContext.Database.GetDbConnection();
         await connection.OpenAsync();
         _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
@@ -73,7 +75,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
     {
         using var scope = Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        
+
         await using var connection = dbContext.Database.GetDbConnection();
         await connection.OpenAsync();
         await _respawner.ResetAsync(connection);

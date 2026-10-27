@@ -7,6 +7,7 @@ public class User
     public const int MaxUsernameLength = 50;
 
     private readonly List<Repost> _reposts = new();
+    private readonly List<Bookmark> _bookmarks = new();
 
     public long Id { get; private set; }
     public string Email { get; private set; } = null!;
@@ -17,6 +18,7 @@ public class User
     public DateTimeOffset RegisteredAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public IReadOnlyCollection<Repost> Reposts => _reposts;
+    public IReadOnlyCollection<Bookmark> Bookmarks => _bookmarks;
 
     /// <summary>
     /// Used by EF Core for materialization. Application code must use <see cref="Register"/>.

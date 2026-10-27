@@ -8,6 +8,7 @@ public class Post
 
     private readonly List<Repost> _reposts = new();
     private readonly List<Post> _replies = new();
+    private readonly List<Bookmark> _bookmarks = new();
 
     public long Id { get; private set; }
     public string? Text { get; private set; }
@@ -22,6 +23,7 @@ public class Post
     public DateTimeOffset? DeletedAt { get; private set; }
     public IReadOnlyCollection<Repost> Reposts => _reposts;
     public IReadOnlyCollection<Post> Replies => _replies;
+    public IReadOnlyCollection<Bookmark> Bookmarks => _bookmarks;
 
     /// <summary>
     /// Used by EF Core for materialization. Application code must use <see cref="Create"/>.

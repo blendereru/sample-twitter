@@ -8,7 +8,7 @@ import { getPostById, getPostReplies, createPost } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostResponse, RepostResponse } from '@/types/api';
+import type { PostResponse, RepostResponse, BookmarkResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,6 +25,7 @@ const parentPost = ref<PostResponse | null>(null);
 const parentPostDeleted = ref(false);
 const replies = ref<PostResponse[]>([]);
 const myRepostedIds = ref<Set<number>>(new Set());
+const myBookmarkedIds = ref<Set<number>>(new Set());
 
 const replyTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const replyFileInputRef = ref<HTMLInputElement | null>(null);
@@ -254,6 +255,14 @@ function handleUndoRepost(id: number) {
   }
 }
 
+function handleBookmarked(response: BookmarkResponse) {
+  myBookmarkedIds.value.add(response.postId);
+}
+
+function handleUndoBookmark(id: number) {
+  myBookmarkedIds.value.delete(id);
+}
+
 function goBack() {
   if (window.history.length > 1) {
     router.back();
@@ -404,11 +413,14 @@ watch(
         :retweets="post.repostCount"
         :replies="replies.length"
         :is-reposted="myRepostedIds.has(post.id)"
+        :is-bookmarked="myBookmarkedIds.has(post.id)"
         :is-focused="true"
         @updated="handleMainPostUpdated"
         @delete="handleMainPostDeleted"
         @reposted="handleReposted"
         @undo-repost="handleUndoRepost"
+        @bookmarked="handleBookmarked"
+        @undo-bookmark="handleUndoBookmark"
         @reply-click="focusReplyInput"
       />
 
@@ -529,10 +541,13 @@ watch(
           :retweets="reply.repostCount"
           :replies="reply.replyCount"
           :is-reposted="myRepostedIds.has(reply.id)"
+          :is-bookmarked="myBookmarkedIds.has(reply.id)"
           @updated="handleReplyUpdated"
           @delete="handleReplyDeleted"
           @reposted="handleReposted"
           @undo-repost="handleUndoRepost"
+          @bookmarked="handleBookmarked"
+          @undo-bookmark="handleUndoBookmark"
         />
       </div>
     </div>

@@ -279,6 +279,72 @@ public class PostService : IPostService
             .ToListAsync(ct);
     }
 
+    public async Task<BookmarkResult> Bookmark(long postId, long userId, CancellationToken ct = default)
+    {
+        var post = await _applicationContext.Posts
+            .SingleOrDefaultAsync(p => p.Id == postId, ct);
+
+        if (post is null)
+        {
+            _logger.LogWarning("Bookmark failed — post {PostId} not found", postId);
+            throw new PostNotFoundException($"Post with id {postId} was not found.");
+        }
+
+        var userExists = await _applicationContext.Users
+            .AnyAsync(u => u.Id == userId, ct);
+
+        if (!userExists)
+        {
+            _logger.LogWarning("Bookmark failed — user {UserId} not found", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        var alreadyBookmarked = await _applicationContext.Bookmarks
+            .AnyAsync(b => b.PostId == postId && b.UserId == userId, ct);
+
+        if (alreadyBookmarked)
+        {
+            _logger.LogWarning("Bookmark failed — user {UserId} has already bookmarked post {PostId}", userId, postId);
+            throw new AlreadyBookmarkedException($"User {userId} has already bookmarked post {postId}.");
+        }
+
+        var bookmark = Models.Bookmark.Create(postId, userId);
+
+        _applicationContext.Bookmarks.Add(bookmark);
+
+        try
+        {
+            await _applicationContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            _logger.LogWarning(ex, "Race condition: duplicate bookmark attempt detected during save for post {PostId} by user {UserId}", postId, userId);
+            throw new AlreadyBookmarkedException($"User {userId} has already bookmarked post {postId} (race condition).");
+        }
+
+        _logger.LogInformation("Post {PostId} bookmarked by user {UserId}", postId, userId);
+
+        return new BookmarkResult(bookmark.PostId, bookmark.UserId, bookmark.CreatedAt);
+    }
+
+    public async Task UndoBookmark(long postId, long userId, CancellationToken ct = default)
+    {
+        var bookmark = await _applicationContext.Bookmarks
+            .SingleOrDefaultAsync(b => b.PostId == postId && b.UserId == userId, ct);
+
+        if (bookmark is null)
+        {
+            _logger.LogWarning(
+                "Undo bookmark failed - post {PostId} not found or user {UserId} hasn't bookmarked this post.", postId, userId);
+            throw new BookmarkNotFoundException($"Bookmark for post {postId} by user {userId} was not found.");
+        }
+
+        _applicationContext.Bookmarks.Remove(bookmark);
+        await _applicationContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Bookmark for post {PostId} by user {UserId} undone", postId, userId);
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)
     {
         return ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;

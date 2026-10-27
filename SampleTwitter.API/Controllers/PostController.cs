@@ -166,6 +166,62 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
+    /// Bookmarks an existing post for the authenticated user.
+    /// </summary>
+    /// <param name="id">The ID of the post to bookmark.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The post was bookmarked successfully; returns the bookmark representation.</response>
+    /// <response code="400">The request is invalid (e.g. invalid post ID format).</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">No post exists with the given ID.</response>
+    /// <response code="409">The authenticated user has already bookmarked this post.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpPost("{id}/bookmark")]
+    [ProducesResponseType(typeof(BookmarkResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Bookmark(long id, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = long.Parse(userIdClaim!);
+
+        var result = await _postService.Bookmark(id, userId, ct);
+
+        return Ok(new BookmarkResponse(result.PostId, result.UserId, result.CreatedAt));
+    }
+
+    /// <summary>
+    /// Removes (undoes) a bookmark of an existing post for the authenticated user.
+    /// </summary>
+    /// <param name="id">The ID of the post whose bookmark should be removed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">The bookmark was removed successfully.</response>
+    /// <response code="400">The request is invalid (e.g. invalid post ID format).</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">The bookmark does not exist (post not found or user has not bookmarked this post).</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpDelete("{id}/bookmark")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> UndoBookmark(long id, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = long.Parse(userIdClaim!);
+
+        await _postService.UndoBookmark(id, userId, ct);
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Retrieves a post by its ID.
     /// </summary>
     /// <response code="200">The post was found.</response>

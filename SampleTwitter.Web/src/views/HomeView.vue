@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import TweetComposer from '@/components/tweet/TweetComposer.vue';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import { useAuthStore } from '@/stores/auth';
-import type { RepostResponse } from '@/types/api';
+import type { RepostResponse, BookmarkResponse } from '@/types/api';
 
 const authStore = useAuthStore();
 const activeTab = ref<'forYou' | 'following'>('forYou');
@@ -22,6 +22,7 @@ interface TweetItem {
   retweets: number;
   replies: number;
   isReposted?: boolean;
+  isBookmarked?: boolean;
 }
 
 const tweets = ref<TweetItem[]>([
@@ -108,6 +109,20 @@ function handleTweetUndoReposted(postId: number) {
     tweet.isReposted = false;
   }
 }
+
+function handleTweetBookmarked(response: BookmarkResponse) {
+  const tweet = tweets.value.find(t => t.id === response.postId);
+  if (tweet) {
+    tweet.isBookmarked = true;
+  }
+}
+
+function handleTweetUndoBookmarked(postId: number) {
+  const tweet = tweets.value.find(t => t.id === postId);
+  if (tweet) {
+    tweet.isBookmarked = false;
+  }
+}
 </script>
 
 <template>
@@ -158,10 +173,13 @@ function handleTweetUndoReposted(postId: number) {
         :retweets="tweet.retweets"
         :replies="tweet.replies"
         :is-reposted="tweet.isReposted"
+        :is-bookmarked="tweet.isBookmarked"
         @updated="handleTweetUpdated"
         @delete="handleDeleteTweet"
         @reposted="handleTweetReposted"
         @undo-repost="handleTweetUndoReposted"
+        @bookmarked="handleTweetBookmarked"
+        @undo-bookmark="handleTweetUndoBookmarked"
       />
     </div>
   </main>

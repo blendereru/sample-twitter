@@ -22,6 +22,24 @@ namespace SampleTwitter.API.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SampleTwitter.API.Models.Bookmark", b =>
+                {
+                    b.Property<long>("PostId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("PostId", "UserId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("Bookmarks");
+                });
+
             modelBuilder.Entity("SampleTwitter.API.Models.EmailConfirmationToken", b =>
                 {
                     b.Property<long>("Id")
@@ -190,6 +208,25 @@ namespace SampleTwitter.API.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("SampleTwitter.API.Models.Bookmark", b =>
+                {
+                    b.HasOne("SampleTwitter.API.Models.Post", "Post")
+                        .WithMany("Bookmarks")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SampleTwitter.API.Models.User", "User")
+                        .WithMany("Bookmarks")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("SampleTwitter.API.Models.EmailConfirmationToken", b =>
                 {
                     b.HasOne("SampleTwitter.API.Models.User", "User")
@@ -251,6 +288,8 @@ namespace SampleTwitter.API.Migrations
 
             modelBuilder.Entity("SampleTwitter.API.Models.Post", b =>
                 {
+                    b.Navigation("Bookmarks");
+
                     b.Navigation("Replies");
 
                     b.Navigation("Reposts");
@@ -258,6 +297,8 @@ namespace SampleTwitter.API.Migrations
 
             modelBuilder.Entity("SampleTwitter.API.Models.User", b =>
                 {
+                    b.Navigation("Bookmarks");
+
                     b.Navigation("Reposts");
                 });
 #pragma warning restore 612, 618

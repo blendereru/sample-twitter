@@ -3,11 +3,11 @@ import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Ima
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { editPost, deletePost, repostPost, undoRepost } from '@/api/posts';
+import { editPost, deletePost, repostPost, undoRepost, bookmarkPost, undoBookmark } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import ImageLightbox from '@/components/common/ImageLightbox.vue';
-import type { RepostResponse } from '@/types/api';
+import type { RepostResponse, BookmarkResponse } from '@/types/api';
 
 const props = defineProps<{
   id: number;
@@ -25,6 +25,7 @@ const props = defineProps<{
   retweets?: number;
   replies?: number;
   isReposted?: boolean;
+  isBookmarked?: boolean;
   isFocused?: boolean;
 }>();
 
@@ -33,6 +34,8 @@ const emit = defineEmits<{
   (e: 'delete', id: number): void;
   (e: 'reposted', response: RepostResponse): void;
   (e: 'undo-repost', id: number): void;
+  (e: 'bookmarked', response: BookmarkResponse): void;
+  (e: 'undo-bookmark', id: number): void;
   (e: 'reply-click'): void;
 }>();
 
@@ -49,6 +52,9 @@ const isReposting = ref(false);
 const reposted = ref(props.isReposted ?? false);
 const repostCount = ref(props.retweets || 0);
 const repostError = ref<string | null>(null);
+
+const isBookmarking = ref(false);
+const bookmarked = ref(props.isBookmarked ?? false);
 
 const replyCount = ref(props.replies || 0);
 
@@ -70,6 +76,13 @@ watch(
   () => props.isReposted,
   (newVal) => {
     if (newVal !== undefined) reposted.value = newVal;
+  }
+);
+
+watch(
+  () => props.isBookmarked,
+  (newVal) => {
+    if (newVal !== undefined) bookmarked.value = newVal;
   }
 );
 
@@ -172,6 +185,57 @@ function handleQuote() {
   setTimeout(() => {
     repostError.value = null;
   }, 3000);
+}
+
+async function toggleBookmark() {
+  if (isBookmarking.value) return;
+
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+
+  if (props.id <= 0) {
+    repostError.value = 'Cannot bookmark demo tweets.';
+    setTimeout(() => {
+      repostError.value = null;
+    }, 3000);
+    return;
+  }
+
+  isBookmarking.value = true;
+  repostError.value = null;
+
+  try {
+    if (!bookmarked.value) {
+      const result = await bookmarkPost(props.id);
+      bookmarked.value = true;
+      emit('bookmarked', result);
+    } else {
+      await undoBookmark(props.id);
+      bookmarked.value = false;
+      emit('undo-bookmark', props.id);
+    }
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    if (!bookmarked.value && parsed.status === 409) {
+      bookmarked.value = true;
+      repostError.value = 'You have already bookmarked this post.';
+    } else if (bookmarked.value && parsed.status === 404) {
+      bookmarked.value = false;
+      emit('undo-bookmark', props.id);
+    } else {
+      repostError.value =
+        parsed.detail ||
+        parsed.message ||
+        (bookmarked.value ? 'Failed to remove bookmark.' : 'Failed to bookmark post.');
+    }
+    setTimeout(() => {
+      repostError.value = null;
+    }, 4000);
+  } finally {
+    isBookmarking.value = false;
+  }
 }
 
 const menuOpen = ref(false);
@@ -761,11 +825,22 @@ async function handleSave() {
 
           <button
             type="button"
-            @click.stop
-            class="flex items-center gap-1.5 hover:text-sky-400 group transition-colors cursor-pointer"
+            @click.stop="toggleBookmark"
+            :disabled="isBookmarking"
+            :title="bookmarked ? 'Remove bookmark' : 'Bookmark'"
+            :class="[
+              'flex items-center gap-1.5 group transition-colors select-none cursor-pointer',
+              bookmarked ? 'text-sky-400' : 'hover:text-sky-400 text-neutral-500'
+            ]"
           >
-            <div class="p-2 rounded-full group-hover:bg-sky-500/10">
-              <Bookmark class="w-4 h-4" />
+            <div
+              :class="[
+                'p-2 rounded-full transition-all group-active:scale-90',
+                bookmarked ? 'bg-sky-500/10 text-sky-400' : 'group-hover:bg-sky-500/10'
+              ]"
+            >
+              <Loader2 v-if="isBookmarking" class="w-4 h-4 animate-spin text-sky-400" />
+              <Bookmark v-else :class="['w-4 h-4', bookmarked ? 'fill-current text-sky-400' : '']" />
             </div>
           </button>
 

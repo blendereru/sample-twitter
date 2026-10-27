@@ -120,6 +120,12 @@ export interface RepostResponse {
   createdAt: string;
 }
 
+export interface BookmarkResponse {
+  postId: number;
+  userId: number;
+  createdAt: string;
+}
+
 export interface PostAuthorDto {
   id: number;
   email: string;

@@ -8,7 +8,7 @@ import ImageLightbox from '@/components/common/ImageLightbox.vue';
 import { getUser, getUserPosts, getUserReplies } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostFeedItemDto, ReplyFeedItemDto, PostAuthorDto, RepostResponse, UserResponse } from '@/types/api';
+import type { PostFeedItemDto, ReplyFeedItemDto, PostAuthorDto, RepostResponse, BookmarkResponse, UserResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -205,6 +205,15 @@ function switchTab(tab: 'posts' | 'replies' | 'highlights' | 'media' | 'likes') 
 }
 
 const myRepostedPostIds = ref<Set<number>>(new Set());
+const myBookmarkedPostIds = ref<Set<number>>(new Set());
+
+function handlePostBookmarked(response: BookmarkResponse) {
+  myBookmarkedPostIds.value.add(response.postId);
+}
+
+function handlePostUndoBookmarked(postId: number) {
+  myBookmarkedPostIds.value.delete(postId);
+}
 
 function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
   const item = posts.value.find(p => p.id === updated.id);
@@ -522,10 +531,13 @@ watch(
             :replies="post.replyCount"
             :can-edit="isMyProfile"
             :is-reposted="myRepostedPostIds.has(post.id)"
+            :is-bookmarked="myBookmarkedPostIds.has(post.id)"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
             @reposted="handlePostReposted"
             @undo-repost="handlePostUndoReposted"
+            @bookmarked="handlePostBookmarked"
+            @undo-bookmark="handlePostUndoBookmarked"
             class="!border-b-0"
           />
         </div>
@@ -652,10 +664,13 @@ watch(
                 :replies="reply.replyCount"
                 :can-edit="isMyProfile"
                 :is-reposted="myRepostedPostIds.has(reply.id)"
+                :is-bookmarked="myBookmarkedPostIds.has(reply.id)"
                 @updated="handleReplyUpdated"
                 @delete="handleReplyDeleted"
                 @reposted="handlePostReposted"
                 @undo-repost="handlePostUndoReposted"
+                @bookmarked="handlePostBookmarked"
+                @undo-bookmark="handlePostUndoBookmarked"
                 class="!border-b-0 !pt-2"
               />
             </div>

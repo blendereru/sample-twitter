@@ -12,6 +12,7 @@ public class ApplicationContext : DbContext
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; } = null!;
     public DbSet<Post> Posts { get; set; } = null!;
     public DbSet<Repost> Reposts { get; set; } = null!;
+    public DbSet<Bookmark> Bookmarks { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,25 @@ public class ApplicationContext : DbContext
             builder.HasIndex(r => new { r.UserId, r.CreatedAt });
 
             builder.HasQueryFilter(r => !r.Post.IsDeleted);
+        });
+
+        modelBuilder.Entity<Bookmark>(builder =>
+        {
+            builder.HasKey(b => new { b.PostId, b.UserId });
+
+            builder.HasOne(b => b.Post)
+                .WithMany(p => p.Bookmarks)
+                .HasForeignKey(b => b.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(b => b.User)
+                .WithMany(u => u.Bookmarks)
+                .HasForeignKey(b => b.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(b => new { b.UserId, b.CreatedAt });
+
+            builder.HasQueryFilter(b => !b.Post.IsDeleted);
         });
 
         modelBuilder.Entity<EmailConfirmationToken>(builder =>

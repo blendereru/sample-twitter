@@ -44,7 +44,8 @@ public sealed class UserInsertBarrierInterceptor : SaveChangesInterceptor
             (eventData.Context.ChangeTracker.Entries<User>().Any(e =>
                  e.State == EntityState.Added ||
                  (e.State == EntityState.Modified && e.Property(u => u.Email).IsModified)) ||
-             eventData.Context.ChangeTracker.Entries<Repost>().Any(e => e.State == EntityState.Added)))
+             eventData.Context.ChangeTracker.Entries<Repost>().Any(e => e.State == EntityState.Added) ||
+             eventData.Context.ChangeTracker.Entries<Bookmark>().Any(e => e.State == EntityState.Added)))
         {
             await barrier.SignalAndWaitAsync(cancellationToken);
         }

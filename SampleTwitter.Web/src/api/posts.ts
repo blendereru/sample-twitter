@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { CreatePostRequest, CreatePostResponse, EditPostRequest, EditPostResponse, RepostResponse, PostResponse } from '@/types/api';
+import type { CreatePostRequest, CreatePostResponse, EditPostRequest, EditPostResponse, RepostResponse, BookmarkResponse, PostResponse } from '@/types/api';
 
 export async function createPost(request: CreatePostRequest): Promise<CreatePostResponse> {
   const response = await apiClient.post<CreatePostResponse>('/posts', request);
@@ -25,6 +25,17 @@ export async function undoRepost(id: number): Promise<void> {
 }
 
 export const undoRepostPost = undoRepost;
+
+export async function bookmarkPost(id: number): Promise<BookmarkResponse> {
+  const response = await apiClient.post<BookmarkResponse>(`/posts/${id}/bookmark`);
+  return response.data;
+}
+
+export async function undoBookmark(id: number): Promise<void> {
+  await apiClient.delete(`/posts/${id}/bookmark`);
+}
+
+export const undoBookmarkPost = undoBookmark;
 
 export async function getPostById(id: number): Promise<PostResponse> {
   const response = await apiClient.get<PostResponse>(`/posts/${id}`);
