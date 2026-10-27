@@ -7,4 +7,5 @@ public record PostFeedItemResult(
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     int RepostCount,
-    int ReplyCount);
+    int ReplyCount,
+    bool IsBookmarked = false);

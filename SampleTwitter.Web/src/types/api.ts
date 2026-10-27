@@ -139,6 +139,7 @@ export interface PostFeedItemDto {
   updatedAt?: string;
   repostCount: number;
   replyCount: number;
+  isBookmarked?: boolean;
 }
 
 export interface PostFeedResponse {
@@ -156,6 +157,7 @@ export interface PostResponse {
   replyId?: number | null;
   repostCount: number;
   replyCount: number;
+  isBookmarked?: boolean;
 }
 
 export interface ReplyFeedItemDto {
@@ -167,6 +169,7 @@ export interface ReplyFeedItemDto {
   parentPost?: PostResponse | null;
   repostCount: number;
   replyCount: number;
+  isBookmarked?: boolean;
 }
 
 export interface ReplyFeedResponse {

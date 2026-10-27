@@ -433,6 +433,89 @@ public class BookmarkTests : IntegrationTestBase
         await secondUndo.AssertProblemDetails(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task ReadEndpoints_ReturnViewerSpecificIsBookmarkedFlag()
+    {
+        // Arrange
+        var (author, authorCookie) = await SeedAndSignIn("author_marker@example.com", "Sup3rSecret1!");
+        var rootPost = await SeedPost(userId: author.Id, text: "root post");
+        var replyPost = await SeedReply(userId: author.Id, replyId: rootPost.Id, text: "reply post");
+
+        var (_, viewerCookie) = await SeedAndSignIn("viewer_marker@example.com", "Sup3rSecret1!");
+
+        // Viewer bookmarks both rootPost and replyPost
+        var b1 = await SendBookmarkRequest(viewerCookie, rootPost.Id);
+        var b2 = await SendBookmarkRequest(viewerCookie, replyPost.Id);
+        Assert.Equal(HttpStatusCode.OK, b1.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, b2.StatusCode);
+
+        // 1. GET /api/posts/{id} as viewer -> IsBookmarked = true
+        var getPostViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var postBodyViewer = await getPostViewer.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyViewer);
+        Assert.True(postBodyViewer.IsBookmarked);
+
+        // 2. GET /api/posts/{id} as anonymous -> IsBookmarked = false
+        var getPostAnon = await Client.GetAsync($"/api/posts/{rootPost.Id}");
+        var postBodyAnon = await getPostAnon.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyAnon);
+        Assert.False(postBodyAnon.IsBookmarked);
+
+        // 3. GET /api/posts/{id} as author (who did not bookmark) -> IsBookmarked = false
+        var getPostAuthor = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}")
+        {
+            Headers = { { "Cookie", authorCookie } }
+        });
+        var postBodyAuthor = await getPostAuthor.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyAuthor);
+        Assert.False(postBodyAuthor.IsBookmarked);
+
+        // 4. GET /api/users/{userId}/posts as viewer -> IsBookmarked = true
+        var getProfilePostsViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/users/{author.Id}/posts")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var profilePostsViewer = await getProfilePostsViewer.Content.ReadFromJsonAsync<PostFeedResponse>();
+        Assert.NotNull(profilePostsViewer);
+        Assert.True(Assert.Single(profilePostsViewer.Items).IsBookmarked);
+
+        // 5. GET /api/users/{userId}/replies as viewer -> IsBookmarked = true on reply and ParentPost
+        var getProfileRepliesViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/users/{author.Id}/replies")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var profileRepliesViewer = await getProfileRepliesViewer.Content.ReadFromJsonAsync<ReplyFeedResponse>();
+        Assert.NotNull(profileRepliesViewer);
+        var singleProfileReply = Assert.Single(profileRepliesViewer.Items);
+        Assert.True(singleProfileReply.IsBookmarked);
+        Assert.NotNull(singleProfileReply.ParentPost);
+        Assert.True(singleProfileReply.ParentPost.IsBookmarked);
+
+        // 6. GET /api/posts/{id}/replies as viewer -> IsBookmarked = true
+        var getRepliesViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}/replies")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var repliesViewer = await getRepliesViewer.Content.ReadFromJsonAsync<List<PostResponse>>();
+        Assert.NotNull(repliesViewer);
+        Assert.True(Assert.Single(repliesViewer).IsBookmarked);
+
+        // 7. Undo bookmark on rootPost -> IsBookmarked becomes false
+        var undoResp = await SendUndoBookmarkRequest(viewerCookie, rootPost.Id);
+        Assert.Equal(HttpStatusCode.NoContent, undoResp.StatusCode);
+
+        var getPostAfterUndo = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var postBodyAfterUndo = await getPostAfterUndo.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyAfterUndo);
+        Assert.False(postBodyAfterUndo.IsBookmarked);
+    }
+
     private Task<HttpResponseMessage> SendBookmarkRequest(string cookie, long postId)
     {
         var message = new HttpRequestMessage(HttpMethod.Post, $"/api/posts/{postId}/bookmark")

@@ -8,4 +8,5 @@ public record ReplyFeedResult(
     DateTimeOffset? UpdatedAt,
     PostAuthorResult Author,
     int RepostCount,
-    int ReplyCount);
+    int ReplyCount,
+    bool IsBookmarked = false);

@@ -257,10 +257,24 @@ function handleUndoRepost(id: number) {
 
 function handleBookmarked(response: BookmarkResponse) {
   myBookmarkedIds.value.add(response.postId);
+  if (post.value && post.value.id === response.postId) {
+    post.value.isBookmarked = true;
+  }
+  const reply = replies.value.find(r => r.id === response.postId);
+  if (reply) {
+    reply.isBookmarked = true;
+  }
 }
 
 function handleUndoBookmark(id: number) {
   myBookmarkedIds.value.delete(id);
+  if (post.value && post.value.id === id) {
+    post.value.isBookmarked = false;
+  }
+  const reply = replies.value.find(r => r.id === id);
+  if (reply) {
+    reply.isBookmarked = false;
+  }
 }
 
 function goBack() {
@@ -413,7 +427,7 @@ watch(
         :retweets="post.repostCount"
         :replies="replies.length"
         :is-reposted="myRepostedIds.has(post.id)"
-        :is-bookmarked="myBookmarkedIds.has(post.id)"
+        :is-bookmarked="Boolean(post.isBookmarked) || myBookmarkedIds.has(post.id)"
         :is-focused="true"
         @updated="handleMainPostUpdated"
         @delete="handleMainPostDeleted"
@@ -541,7 +555,7 @@ watch(
           :retweets="reply.repostCount"
           :replies="reply.replyCount"
           :is-reposted="myRepostedIds.has(reply.id)"
-          :is-bookmarked="myBookmarkedIds.has(reply.id)"
+          :is-bookmarked="Boolean(reply.isBookmarked) || myBookmarkedIds.has(reply.id)"
           @updated="handleReplyUpdated"
           @delete="handleReplyDeleted"
           @reposted="handleReposted"

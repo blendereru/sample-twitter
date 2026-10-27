@@ -74,7 +74,7 @@ public class PostService : IPostService
             post.UpdatedAt);
     }
 
-    public async Task<ProfilePostFeedResult> GetPosts(long userId, CancellationToken ct = default)
+    public async Task<ProfilePostFeedResult> GetPosts(long userId, long? viewerUserId = null, CancellationToken ct = default)
     {
         var user = await _applicationContext.Users
             .AsNoTracking()
@@ -97,7 +97,8 @@ public class PostService : IPostService
                     p.CreatedAt,
                     p.UpdatedAt,
                     p.Reposts.Count,
-                    p.Replies.Count))
+                    p.Replies.Count,
+                    viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
 
         return new ProfilePostFeedResult(posts, new PostAuthorResult(user.Id, user.Email));
@@ -187,7 +188,7 @@ public class PostService : IPostService
         _logger.LogInformation("Repost for post {PostId} by user {UserId} undone", postId, userId);
     }
 
-    public async Task<PostResult> GetById(long id, CancellationToken ct = default)
+    public async Task<PostResult> GetById(long id, long? viewerUserId = null, CancellationToken ct = default)
     {
         var post = await _applicationContext.Posts
             .Where(p => p.Id == id)
@@ -200,7 +201,8 @@ public class PostService : IPostService
                 new PostAuthorResult(p.User.Id, p.User.Email),
                 p.ReplyId,
                 p.Reposts.Count,
-                p.Replies.Count))
+                p.Replies.Count,
+                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
             .SingleOrDefaultAsync(ct);
 
         if (post is null)
@@ -212,7 +214,7 @@ public class PostService : IPostService
         return post;
     }
 
-    public async Task<ProfileReplyFeedResult> GetProfileReplies(long userId, CancellationToken ct = default)
+    public async Task<ProfileReplyFeedResult> GetProfileReplies(long userId, long? viewerUserId = null, CancellationToken ct = default)
     {
         var user = await _applicationContext.Users
             .AsNoTracking()
@@ -245,15 +247,17 @@ public class PostService : IPostService
                         new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email),
                         ReplyId: null,
                         p.Reply.Reposts.Count,
-                        p.Reply.Replies.Count),
+                        p.Reply.Replies.Count,
+                        viewerUserId.HasValue && p.Reply.Bookmarks.Any(b => b.UserId == viewerUserId.Value)),
                 p.Reposts.Count,
-                p.Replies.Count))
+                p.Replies.Count,
+                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
 
         return new ProfileReplyFeedResult(repliesFeed, new PostAuthorResult(user.Id, user.Email));
     }
 
-    public async Task<List<ReplyFeedResult>> GetReplies(long postId, CancellationToken ct = default)
+    public async Task<List<ReplyFeedResult>> GetReplies(long postId, long? viewerUserId = null, CancellationToken ct = default)
     {
         var postExists = await _applicationContext.Posts
             .AnyAsync(p => p.Id == postId, ct);
@@ -275,7 +279,8 @@ public class PostService : IPostService
                 p.UpdatedAt,
                 new PostAuthorResult(p.UserId, p.User.Email),
                 p.Reposts.Count,
-                p.Replies.Count))
+                p.Replies.Count,
+                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
     }
 

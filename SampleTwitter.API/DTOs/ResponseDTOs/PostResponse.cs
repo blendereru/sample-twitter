@@ -12,4 +12,5 @@ public record PostResponse(
     PostAuthorDto Author,
     long? ReplyId,
     int RepostCount,
-    int ReplyCount);
+    int ReplyCount,
+    bool IsBookmarked = false);

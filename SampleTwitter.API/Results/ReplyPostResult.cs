@@ -8,4 +8,5 @@ public record ReplyPostResult(
     DateTimeOffset? UpdatedAt,
     PostResult? ParentPost,
     int RepostCount,
-    int ReplyCount);
+    int ReplyCount,
+    bool IsBookmarked = false);

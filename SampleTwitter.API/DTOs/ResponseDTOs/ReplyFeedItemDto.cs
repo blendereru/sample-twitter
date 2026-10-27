@@ -11,6 +11,7 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="ParentPost">The post to which the reply was made to.</param>
 /// <param name="RepostCount">The total number of reposts this reply has received.</param>
 /// <param name="ReplyCount">The total number of replies this reply has received.</param>
+/// <param name="IsBookmarked">Whether the current authenticated user has bookmarked this reply.</param>
 public record ReplyFeedItemDto(
     long Id,
     string? Text,
@@ -19,4 +20,5 @@ public record ReplyFeedItemDto(
     DateTimeOffset? UpdatedAt,
     PostResponse? ParentPost,
     int RepostCount,
-    int ReplyCount);
+    int ReplyCount,
+    bool IsBookmarked = false);

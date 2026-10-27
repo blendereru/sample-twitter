@@ -37,7 +37,8 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetProfilePosts(long userId, CancellationToken ct)
     {
-        var feed = await _postService.GetPosts(userId, ct);
+        var viewerUserId = GetCurrentUserIdOrNull();
+        var feed = await _postService.GetPosts(userId, viewerUserId, ct);
 
         var items = feed.Items
             .Select(i => new PostFeedItemDto(
@@ -47,7 +48,8 @@ public class UsersController : ControllerBase
                 i.CreatedAt,
                 i.UpdatedAt,
                 i.RepostCount,
-                i.ReplyCount))
+                i.ReplyCount,
+                i.IsBookmarked))
             .ToList();
 
         return Ok(new PostFeedResponse(items, new PostAuthorDto(feed.Author.Id, feed.Author.Email)));
@@ -67,7 +69,8 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetProfileReplies(long userId, CancellationToken ct)
     {
-        var feed = await _postService.GetProfileReplies(userId, ct);
+        var viewerUserId = GetCurrentUserIdOrNull();
+        var feed = await _postService.GetProfileReplies(userId, viewerUserId, ct);
         return Ok(feed.Adapt<ReplyFeedResponse>());
     }
 
@@ -119,5 +122,11 @@ public class UsersController : ControllerBase
         var result = await _accountService.Edit(id, request, currentUserId, ct);
 
         return Ok(new EditProfileResponse(result.Id, result.Username, result.ImageUrl, result.UpdatedAt));
+    }
+
+    private long? GetCurrentUserIdOrNull()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return long.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }

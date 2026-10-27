@@ -209,10 +209,22 @@ const myBookmarkedPostIds = ref<Set<number>>(new Set());
 
 function handlePostBookmarked(response: BookmarkResponse) {
   myBookmarkedPostIds.value.add(response.postId);
+  for (const p of posts.value) {
+    if (p.id === response.postId) p.isBookmarked = true;
+  }
+  for (const r of replies.value) {
+    if (r.id === response.postId) r.isBookmarked = true;
+  }
 }
 
 function handlePostUndoBookmarked(postId: number) {
   myBookmarkedPostIds.value.delete(postId);
+  for (const p of posts.value) {
+    if (p.id === postId) p.isBookmarked = false;
+  }
+  for (const r of replies.value) {
+    if (r.id === postId) r.isBookmarked = false;
+  }
 }
 
 function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
@@ -531,7 +543,7 @@ watch(
             :replies="post.replyCount"
             :can-edit="isMyProfile"
             :is-reposted="myRepostedPostIds.has(post.id)"
-            :is-bookmarked="myBookmarkedPostIds.has(post.id)"
+            :is-bookmarked="Boolean(post.isBookmarked) || myBookmarkedPostIds.has(post.id)"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
             @reposted="handlePostReposted"
@@ -664,7 +676,7 @@ watch(
                 :replies="reply.replyCount"
                 :can-edit="isMyProfile"
                 :is-reposted="myRepostedPostIds.has(reply.id)"
-                :is-bookmarked="myBookmarkedPostIds.has(reply.id)"
+                :is-bookmarked="Boolean(reply.isBookmarked) || myBookmarkedPostIds.has(reply.id)"
                 @updated="handleReplyUpdated"
                 @delete="handleReplyDeleted"
                 @reposted="handlePostReposted"

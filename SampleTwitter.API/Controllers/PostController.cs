@@ -232,7 +232,8 @@ public class PostController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(long id, CancellationToken ct)
     {
-        var result = await _postService.GetById(id, ct);
+        var viewerUserId = GetCurrentUserIdOrNull();
+        var result = await _postService.GetById(id, viewerUserId, ct);
 
         var response = new PostResponse(
             result.Id,
@@ -243,7 +244,8 @@ public class PostController : ControllerBase
             new PostAuthorDto(result.Author.Id, result.Author.Email),
             result.ReplyId,
             result.RepostCount,
-            result.ReplyCount);
+            result.ReplyCount,
+            result.IsBookmarked);
 
         return Ok(response);
     }
@@ -262,7 +264,8 @@ public class PostController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetReplies(long id, CancellationToken ct)
     {
-        var results = await _postService.GetReplies(id, ct);
+        var viewerUserId = GetCurrentUserIdOrNull();
+        var results = await _postService.GetReplies(id, viewerUserId, ct);
 
         var response = results.Select(r => new PostResponse(
             r.Id,
@@ -273,8 +276,15 @@ public class PostController : ControllerBase
             new PostAuthorDto(r.Author.Id, r.Author.Email),
             id,
             r.RepostCount,
-            r.ReplyCount)).ToList();
+            r.ReplyCount,
+            r.IsBookmarked)).ToList();
 
         return Ok(response);
+    }
+
+    private long? GetCurrentUserIdOrNull()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return long.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }

@@ -9,4 +9,5 @@ public record PostResult(
     PostAuthorResult Author,
     long? ReplyId,
     int RepostCount,
-    int ReplyCount);
+    int ReplyCount,
+    bool IsBookmarked = false);

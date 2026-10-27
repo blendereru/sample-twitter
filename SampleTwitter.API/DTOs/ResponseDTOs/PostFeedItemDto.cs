@@ -10,6 +10,7 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="UpdatedAt">The date and time when the post was last edited, or null if never edited.</param>
 /// <param name="RepostCount">The total number of reposts this post has received.</param>
 /// <param name="ReplyCount">The total number of direct replies this post has received.</param>
+/// <param name="IsBookmarked">Whether the current authenticated user has bookmarked this post.</param>
 public record PostFeedItemDto(
     long Id,
     string? Text,
@@ -17,5 +18,6 @@ public record PostFeedItemDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     int RepostCount,
-    int ReplyCount
+    int ReplyCount,
+    bool IsBookmarked = false
 );
