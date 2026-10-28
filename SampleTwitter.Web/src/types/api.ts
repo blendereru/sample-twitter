@@ -140,6 +140,7 @@ export interface PostFeedItemDto {
   repostCount: number;
   replyCount: number;
   isBookmarked?: boolean;
+  isReposted?: boolean;
 }
 
 export interface PostFeedResponse {
@@ -158,6 +159,7 @@ export interface PostResponse {
   repostCount: number;
   replyCount: number;
   isBookmarked?: boolean;
+  isReposted?: boolean;
 }
 
 export interface ReplyFeedItemDto {
@@ -170,6 +172,7 @@ export interface ReplyFeedItemDto {
   repostCount: number;
   replyCount: number;
   isBookmarked?: boolean;
+  isReposted?: boolean;
 }
 
 export interface ReplyFeedResponse {

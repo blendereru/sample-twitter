@@ -8,4 +8,5 @@ public record PostFeedItemResult(
     DateTimeOffset? UpdatedAt,
     int RepostCount,
     int ReplyCount,
-    bool IsBookmarked = false);
+    bool IsBookmarked = false,
+    bool IsReposted = false);

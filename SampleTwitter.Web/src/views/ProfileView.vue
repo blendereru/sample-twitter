@@ -259,11 +259,13 @@ function handlePostReposted(response: RepostResponse) {
   for (const p of posts.value) {
     if (p.id === response.postId) {
       p.repostCount = (p.repostCount || 0) + 1;
+      p.isReposted = true;
     }
   }
   for (const r of replies.value) {
     if (r.id === response.postId) {
       r.repostCount = (r.repostCount || 0) + 1;
+      r.isReposted = true;
     }
   }
 }
@@ -274,11 +276,13 @@ function handlePostUndoReposted(postId: number) {
   for (const p of posts.value) {
     if (p.id === postId) {
       p.repostCount = Math.max(0, (p.repostCount || 0) - 1);
+      p.isReposted = false;
     }
   }
   for (const r of replies.value) {
     if (r.id === postId) {
       r.repostCount = Math.max(0, (r.repostCount || 0) - 1);
+      r.isReposted = false;
     }
   }
 }
@@ -542,7 +546,7 @@ watch(
             :retweets="post.repostCount"
             :replies="post.replyCount"
             :can-edit="isMyProfile"
-            :is-reposted="myRepostedPostIds.has(post.id)"
+            :is-reposted="Boolean(post.isReposted) || myRepostedPostIds.has(post.id)"
             :is-bookmarked="Boolean(post.isBookmarked) || myBookmarkedPostIds.has(post.id)"
             @updated="handlePostUpdated"
             @delete="handlePostDeleted"
@@ -675,7 +679,7 @@ watch(
                 :retweets="reply.repostCount"
                 :replies="reply.replyCount"
                 :can-edit="isMyProfile"
-                :is-reposted="myRepostedPostIds.has(reply.id)"
+                :is-reposted="Boolean(reply.isReposted) || myRepostedPostIds.has(reply.id)"
                 :is-bookmarked="Boolean(reply.isBookmarked) || myBookmarkedPostIds.has(reply.id)"
                 @updated="handleReplyUpdated"
                 @delete="handleReplyDeleted"

@@ -13,4 +13,5 @@ public record PostResponse(
     long? ReplyId,
     int RepostCount,
     int ReplyCount,
-    bool IsBookmarked = false);
+    bool IsBookmarked = false,
+    bool IsReposted = false);

@@ -98,7 +98,8 @@ public class PostService : IPostService
                     p.UpdatedAt,
                     p.Reposts.Count,
                     p.Replies.Count,
-                    viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
+                    viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
+                    viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
 
         return new ProfilePostFeedResult(posts, new PostAuthorResult(user.Id, user.Email));
@@ -202,7 +203,8 @@ public class PostService : IPostService
                 p.ReplyId,
                 p.Reposts.Count,
                 p.Replies.Count,
-                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
+                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
+                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
             .SingleOrDefaultAsync(ct);
 
         if (post is null)
@@ -248,10 +250,12 @@ public class PostService : IPostService
                         ReplyId: null,
                         p.Reply.Reposts.Count,
                         p.Reply.Replies.Count,
-                        viewerUserId.HasValue && p.Reply.Bookmarks.Any(b => b.UserId == viewerUserId.Value)),
+                        viewerUserId.HasValue && p.Reply.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
+                        viewerUserId.HasValue && p.Reply.Reposts.Any(r => r.UserId == viewerUserId.Value)),
                 p.Reposts.Count,
                 p.Replies.Count,
-                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
+                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
+                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
 
         return new ProfileReplyFeedResult(repliesFeed, new PostAuthorResult(user.Id, user.Email));
@@ -280,7 +284,8 @@ public class PostService : IPostService
                 new PostAuthorResult(p.UserId, p.User.Email),
                 p.Reposts.Count,
                 p.Replies.Count,
-                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value)))
+                viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
+                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
     }
 

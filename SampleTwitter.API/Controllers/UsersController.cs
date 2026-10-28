@@ -49,7 +49,8 @@ public class UsersController : ControllerBase
                 i.UpdatedAt,
                 i.RepostCount,
                 i.ReplyCount,
-                i.IsBookmarked))
+                i.IsBookmarked,
+                i.IsReposted))
             .ToList();
 
         return Ok(new PostFeedResponse(items, new PostAuthorDto(feed.Author.Id, feed.Author.Email)));

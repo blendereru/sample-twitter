@@ -9,4 +9,5 @@ public record ReplyPostResult(
     PostResult? ParentPost,
     int RepostCount,
     int ReplyCount,
-    bool IsBookmarked = false);
+    bool IsBookmarked = false,
+    bool IsReposted = false);

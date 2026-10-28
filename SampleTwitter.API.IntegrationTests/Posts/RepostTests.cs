@@ -2,12 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
-using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.IntegrationTests.Infrastructure;
-using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.IntegrationTests.Posts;
 
@@ -458,5 +455,88 @@ public class RepostTests : IntegrationTestBase
 
         // Assert 2 — Returns 404 ProblemDetails
         await secondUndo.AssertProblemDetails(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ReadEndpoints_ReturnViewerSpecificIsRepostedFlag()
+    {
+        // Arrange
+        var (author, authorCookie) = await SeedAndSignIn("author_repost_marker@example.com", "Sup3rSecret1!");
+        var rootPost = await SeedPost(userId: author.Id, text: "root post");
+        var replyPost = await SeedReply(userId: author.Id, replyId: rootPost.Id, text: "reply post");
+
+        var (_, viewerCookie) = await SeedAndSignIn("viewer_repost_marker@example.com", "Sup3rSecret1!");
+
+        // Viewer reposts both rootPost and replyPost
+        var r1 = await SendRepostRequest(viewerCookie, rootPost.Id);
+        var r2 = await SendRepostRequest(viewerCookie, replyPost.Id);
+        Assert.Equal(HttpStatusCode.OK, r1.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, r2.StatusCode);
+
+        // 1. GET /api/posts/{id} as viewer -> IsReposted = true
+        var getPostViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var postBodyViewer = await getPostViewer.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyViewer);
+        Assert.True(postBodyViewer.IsReposted);
+
+        // 2. GET /api/posts/{id} as anonymous -> IsReposted = false
+        var getPostAnon = await Client.GetAsync($"/api/posts/{rootPost.Id}");
+        var postBodyAnon = await getPostAnon.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyAnon);
+        Assert.False(postBodyAnon.IsReposted);
+
+        // 3. GET /api/posts/{id} as author (who did not repost) -> IsReposted = false
+        var getPostAuthor = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}")
+        {
+            Headers = { { "Cookie", authorCookie } }
+        });
+        var postBodyAuthor = await getPostAuthor.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyAuthor);
+        Assert.False(postBodyAuthor.IsReposted);
+
+        // 4. GET /api/users/{userId}/posts as viewer -> IsReposted = true
+        var getProfilePostsViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/users/{author.Id}/posts")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var profilePostsViewer = await getProfilePostsViewer.Content.ReadFromJsonAsync<PostFeedResponse>();
+        Assert.NotNull(profilePostsViewer);
+        Assert.True(Assert.Single(profilePostsViewer.Items).IsReposted);
+
+        // 5. GET /api/users/{userId}/replies as viewer -> IsReposted = true on reply and ParentPost
+        var getProfileRepliesViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/users/{author.Id}/replies")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var profileRepliesViewer = await getProfileRepliesViewer.Content.ReadFromJsonAsync<ReplyFeedResponse>();
+        Assert.NotNull(profileRepliesViewer);
+        var singleProfileReply = Assert.Single(profileRepliesViewer.Items);
+        Assert.True(singleProfileReply.IsReposted);
+        Assert.NotNull(singleProfileReply.ParentPost);
+        Assert.True(singleProfileReply.ParentPost.IsReposted);
+
+        // 6. GET /api/posts/{id}/replies as viewer -> IsReposted = true
+        var getRepliesViewer = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}/replies")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var repliesViewer = await getRepliesViewer.Content.ReadFromJsonAsync<List<PostResponse>>();
+        Assert.NotNull(repliesViewer);
+        Assert.True(Assert.Single(repliesViewer).IsReposted);
+
+        // 7. Undo repost on rootPost -> IsReposted becomes false
+        var undoResp = await SendUndoRepostRequest(viewerCookie, rootPost.Id);
+        Assert.Equal(HttpStatusCode.NoContent, undoResp.StatusCode);
+
+        var getPostAfterUndo = await Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, $"/api/posts/{rootPost.Id}")
+        {
+            Headers = { { "Cookie", viewerCookie } }
+        });
+        var postBodyAfterUndo = await getPostAfterUndo.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(postBodyAfterUndo);
+        Assert.False(postBodyAfterUndo.IsReposted);
     }
 }

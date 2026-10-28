@@ -237,10 +237,12 @@ function handleReposted(response: RepostResponse) {
   myRepostedIds.value.add(response.postId);
   if (post.value && post.value.id === response.postId) {
     post.value.repostCount = (post.value.repostCount || 0) + 1;
+    post.value.isReposted = true;
   }
   const reply = replies.value.find(r => r.id === response.postId);
   if (reply) {
     reply.repostCount = (reply.repostCount || 0) + 1;
+    reply.isReposted = true;
   }
 }
 
@@ -248,10 +250,12 @@ function handleUndoRepost(id: number) {
   myRepostedIds.value.delete(id);
   if (post.value && post.value.id === id) {
     post.value.repostCount = Math.max(0, (post.value.repostCount || 0) - 1);
+    post.value.isReposted = false;
   }
   const reply = replies.value.find(r => r.id === id);
   if (reply) {
     reply.repostCount = Math.max(0, (reply.repostCount || 0) - 1);
+    reply.isReposted = false;
   }
 }
 
@@ -426,7 +430,7 @@ watch(
         :updated-at="post.updatedAt"
         :retweets="post.repostCount"
         :replies="replies.length"
-        :is-reposted="myRepostedIds.has(post.id)"
+        :is-reposted="Boolean(post.isReposted) || myRepostedIds.has(post.id)"
         :is-bookmarked="Boolean(post.isBookmarked) || myBookmarkedIds.has(post.id)"
         :is-focused="true"
         @updated="handleMainPostUpdated"
@@ -554,7 +558,7 @@ watch(
           :updated-at="reply.updatedAt"
           :retweets="reply.repostCount"
           :replies="reply.replyCount"
-          :is-reposted="myRepostedIds.has(reply.id)"
+          :is-reposted="Boolean(reply.isReposted) || myRepostedIds.has(reply.id)"
           :is-bookmarked="Boolean(reply.isBookmarked) || myBookmarkedIds.has(reply.id)"
           @updated="handleReplyUpdated"
           @delete="handleReplyDeleted"

@@ -245,7 +245,8 @@ public class PostController : ControllerBase
             result.ReplyId,
             result.RepostCount,
             result.ReplyCount,
-            result.IsBookmarked);
+            result.IsBookmarked,
+            result.IsReposted);
 
         return Ok(response);
     }
@@ -277,7 +278,8 @@ public class PostController : ControllerBase
             id,
             r.RepostCount,
             r.ReplyCount,
-            r.IsBookmarked)).ToList();
+            r.IsBookmarked,
+            r.IsReposted)).ToList();
 
         return Ok(response);
     }

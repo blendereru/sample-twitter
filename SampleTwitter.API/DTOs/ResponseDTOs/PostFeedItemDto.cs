@@ -11,6 +11,7 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="RepostCount">The total number of reposts this post has received.</param>
 /// <param name="ReplyCount">The total number of direct replies this post has received.</param>
 /// <param name="IsBookmarked">Whether the current authenticated user has bookmarked this post.</param>
+/// <param name="IsReposted">Whether the current authenticated user has reposted this post.</param>
 public record PostFeedItemDto(
     long Id,
     string? Text,
@@ -19,5 +20,6 @@ public record PostFeedItemDto(
     DateTimeOffset? UpdatedAt,
     int RepostCount,
     int ReplyCount,
-    bool IsBookmarked = false
+    bool IsBookmarked = false,
+    bool IsReposted = false
 );

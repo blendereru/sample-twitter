@@ -9,4 +9,5 @@ public record ReplyFeedResult(
     PostAuthorResult Author,
     int RepostCount,
     int ReplyCount,
-    bool IsBookmarked = false);
+    bool IsBookmarked = false,
+    bool IsReposted = false);
