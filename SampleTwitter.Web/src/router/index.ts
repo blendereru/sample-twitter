@@ -7,6 +7,7 @@ import ForgotPasswordView from '@/views/ForgotPasswordView.vue';
 import ResetPasswordView from '@/views/ResetPasswordView.vue';
 import ProfileView from '@/views/ProfileView.vue';
 import PostDetailView from '@/views/PostDetailView.vue';
+import BookmarksView from '@/views/BookmarksView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -40,6 +41,11 @@ const router = createRouter({
       path: '/confirm-email',
       name: 'confirm-email',
       component: ConfirmEmailView,
+    },
+    {
+      path: '/bookmarks',
+      name: 'bookmarks',
+      component: BookmarksView,
     },
     {
       path: '/profile/:id',

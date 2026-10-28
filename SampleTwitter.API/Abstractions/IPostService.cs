@@ -16,4 +16,5 @@ public interface IPostService
     Task<List<ReplyFeedResult>> GetReplies(long postId, long? viewerUserId = null, CancellationToken ct = default);
     Task<BookmarkResult> Bookmark(long postId, long userId, CancellationToken ct = default);
     Task UndoBookmark(long postId, long userId, CancellationToken ct = default);
+    Task<List<BookmarkFeedResult>> GetBookmarks(long userId, CancellationToken ct = default);
 }

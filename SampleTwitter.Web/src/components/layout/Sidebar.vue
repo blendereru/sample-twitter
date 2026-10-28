@@ -18,7 +18,7 @@ const navItems = computed(() => [
   { name: 'Explore', path: '/#explore', icon: Hash },
   { name: 'Notifications', path: '/#notifications', icon: Bell },
   { name: 'Messages', path: '/#messages', icon: Mail },
-  { name: 'Bookmarks', path: '/#bookmarks', icon: Bookmark },
+  { name: 'Bookmarks', path: '/bookmarks', icon: Bookmark },
   { name: 'Profile', path: profilePath.value, icon: User },
 ]);
 

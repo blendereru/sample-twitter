@@ -355,6 +355,32 @@ public class PostService : IPostService
         _logger.LogInformation("Bookmark for post {PostId} by user {UserId} undone", postId, userId);
     }
 
+    public async Task<List<BookmarkFeedResult>> GetBookmarks(long userId, CancellationToken ct = default)
+    {
+        if (!await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
+        {
+            _logger.LogWarning("Bookmarks feed requested for non-existent user {UserId}", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        return await _applicationContext.Bookmarks
+            .Where(b => b.UserId == userId)
+            .OrderByDescending(b => b.CreatedAt)
+            .ThenByDescending(b => b.PostId)
+            .Select(b => new BookmarkFeedResult(
+                b.Post.Id,
+                b.Post.Text,
+                b.Post.ImageUrl,
+                b.Post.CreatedAt,
+                b.Post.UpdatedAt,
+                new PostAuthorResult(b.Post.UserId, b.Post.User.Email),
+                b.Post.ReplyId,
+                b.Post.Reposts.Count,
+                b.Post.Replies.Count,
+                b.Post.Reposts.Any(r => r.UserId == userId)))
+            .ToListAsync(ct);
+    }
+
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)
     {
         return ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;

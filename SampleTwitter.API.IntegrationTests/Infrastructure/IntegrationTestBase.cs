@@ -76,7 +76,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         string? imageUrl = null,
         long? replyId = null,
         DateTimeOffset? createdAt = null,
-        DateTimeOffset? updatedAt = null)
+        DateTimeOffset? updatedAt = null,
+        bool isDeleted = false)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
@@ -85,6 +86,11 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         if (updatedAt is not null)
         {
             post.Edit(userId, text, imageUrl, updatedAt);
+        }
+
+        if (isDeleted)
+        {
+            post.Delete(userId);
         }
 
         db.Posts.Add(post);
@@ -106,6 +112,17 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         db.Reposts.Add(repost);
         await db.SaveChangesAsync();
         return repost;
+    }
+
+    protected async Task<Bookmark> SeedBookmark(long userId, long postId, DateTimeOffset? createdAt = null)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+
+        var bookmark = Bookmark.Create(postId, userId, createdAt);
+        db.Bookmarks.Add(bookmark);
+        await db.SaveChangesAsync();
+        return bookmark;
     }
 
     protected async Task<long> GetUserId(string cookie)

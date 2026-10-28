@@ -76,6 +76,43 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
+    /// Returns the bookmarked posts feed for the currently authenticated user.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Bookmarks feed returned successfully.</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">Authenticated user no longer exists.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpGet("bookmarks")]
+    [ProducesResponseType(typeof(List<PostResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetBookmarks(CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserId = long.Parse(userIdClaim!);
+
+        var results = await _postService.GetBookmarks(currentUserId, ct);
+
+        var response = results.Select(b => new PostResponse(
+            b.Id,
+            b.Text,
+            b.ImageUrl,
+            b.CreatedAt,
+            b.UpdatedAt,
+            new PostAuthorDto(b.Author.Id, b.Author.Email),
+            b.ReplyId,
+            b.RepostCount,
+            b.ReplyCount,
+            IsBookmarked: true,
+            b.IsReposted)).ToList();
+
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Returns the user info for the given user.
     /// </summary>
     /// <param name="id">The ID of the user to retrieve info about</param>

@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import type {
   PostFeedResponse,
+  PostResponse,
   ReplyFeedResponse,
   UserResponse,
   EditProfileRequest,
@@ -24,5 +25,10 @@ export async function getUserPosts(userId: number): Promise<PostFeedResponse> {
 
 export async function getUserReplies(userId: number): Promise<ReplyFeedResponse> {
   const response = await apiClient.get<ReplyFeedResponse>(`/users/${userId}/replies`);
+  return response.data;
+}
+
+export async function getUserBookmarks(): Promise<PostResponse[]> {
+  const response = await apiClient.get<PostResponse[]>('/users/bookmarks');
   return response.data;
 }
