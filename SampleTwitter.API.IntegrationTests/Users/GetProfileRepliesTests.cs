@@ -184,6 +184,10 @@ public class GetProfileRepliesTests : IntegrationTestBase
         Assert.NotNull(item.ParentPost);
         Assert.Equal(replyB.Id, item.ParentPost.Id);
         Assert.Equal("Reply from B", item.ParentPost.Text);
+        Assert.Equal(root.Id, item.ParentPost.ReplyId);
+        Assert.NotNull(item.ParentPost.ReplyToAuthor);
+        Assert.Equal(userA.Id, item.ParentPost.ReplyToAuthor.Id);
+        Assert.Equal(userA.Email, item.ParentPost.ReplyToAuthor.Email);
     }
 
     [Fact]
@@ -549,7 +553,7 @@ public class GetProfileRepliesTests : IntegrationTestBase
         var parent = await SeedPost(author.Id, "Parent post");
         var replyR = await SeedReply(author.Id, parent.Id, "Reply R");
 
-        var child1 = await SeedReply(author.Id, replyR.Id, "Active child reply");
+        await SeedReply(author.Id, replyR.Id, "Active child reply");
         var child2 = await SeedReply(author.Id, replyR.Id, "Child reply to delete");
 
         var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{child2.Id}")
@@ -570,5 +574,4 @@ public class GetProfileRepliesTests : IntegrationTestBase
         var itemR = body.Items.Single(i => i.Id == replyR.Id);
         Assert.Equal(1, itemR.ReplyCount);
     }
-
 }

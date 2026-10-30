@@ -13,12 +13,10 @@ namespace SampleTwitter.API.Controllers;
 public class PostController : ControllerBase
 {
     private readonly IPostService _postService;
-    private readonly ILogger<PostController> _logger;
 
-    public PostController(IPostService postService, ILogger<PostController> logger)
+    public PostController(IPostService postService)
     {
         _postService = postService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -246,7 +244,10 @@ public class PostController : ControllerBase
             result.RepostCount,
             result.ReplyCount,
             result.IsBookmarked,
-            result.IsReposted);
+            result.IsReposted,
+            result.ReplyToAuthor is null
+                ? null
+                : new PostAuthorDto(result.ReplyToAuthor.Id, result.ReplyToAuthor.Email));
 
         return Ok(response);
     }

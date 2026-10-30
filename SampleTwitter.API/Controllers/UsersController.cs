@@ -107,7 +107,10 @@ public class UsersController : ControllerBase
             b.RepostCount,
             b.ReplyCount,
             IsBookmarked: true,
-            b.IsReposted)).ToList();
+            b.IsReposted,
+            b.ReplyToAuthor is null
+                ? null
+                : new PostAuthorDto(b.ReplyToAuthor.Id, b.ReplyToAuthor.Email))).ToList();
 
         return Ok(response);
     }

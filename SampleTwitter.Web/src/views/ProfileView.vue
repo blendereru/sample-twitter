@@ -624,6 +624,23 @@ watch(
                   <span class="text-neutral-500 hover:underline">{{ formatDate(reply.parentPost.createdAt) }}</span>
                 </div>
 
+                <div
+                  v-if="reply.parentPost.replyId"
+                  class="text-xs text-neutral-500 flex items-center gap-1 -mt-0.5"
+                >
+                  <span>Replying to</span>
+                  <span
+                    v-if="reply.parentPost.replyToAuthor"
+                    @click.stop="router.push(`/profile/${reply.parentPost.replyToAuthor.id}`)"
+                    class="text-sky-500 font-medium hover:underline cursor-pointer"
+                  >
+                    @{{ reply.parentPost.replyToAuthor.email.split('@')[0] }}
+                  </span>
+                  <span v-else class="text-neutral-500 italic">
+                    a deleted post
+                  </span>
+                </div>
+
                 <p v-if="reply.parentPost.text" class="text-sm leading-relaxed text-neutral-300 whitespace-pre-line">
                   {{ reply.parentPost.text }}
                 </p>
@@ -656,16 +673,6 @@ watch(
 
             <!-- Reply Card -->
             <div class="relative">
-              <div class="text-xs text-neutral-500 px-4 pt-1.5 pb-0 flex items-center gap-1.5 ml-13">
-                <span>Replying to</span>
-                <span
-                  @click="reply.parentPost ? router.push(`/post/${reply.parentPost.id}`) : undefined"
-                  :class="['text-sky-500 font-medium', reply.parentPost ? 'hover:underline cursor-pointer' : '']"
-                >
-                  {{ reply.parentPost?.author ? `@${reply.parentPost.author.email.split('@')[0]}` : reply.parentPost ? `Post #${reply.parentPost.id}` : 'a deleted post' }}
-                </span>
-              </div>
-
               <TweetCard
                 :id="reply.id"
                 :user-id="profileAuthor?.id ?? targetUserId"
@@ -678,6 +685,8 @@ watch(
                 :updated-at="reply.updatedAt"
                 :retweets="reply.repostCount"
                 :replies="reply.replyCount"
+                :reply-id="reply.parentPost?.id ?? -1"
+                :reply-to-author="reply.parentPost?.author ?? null"
                 :can-edit="isMyProfile"
                 :is-reposted="Boolean(reply.isReposted) || myRepostedPostIds.has(reply.id)"
                 :is-bookmarked="Boolean(reply.isBookmarked) || myBookmarkedPostIds.has(reply.id)"

@@ -160,6 +160,7 @@ export interface PostResponse {
   replyCount: number;
   isBookmarked?: boolean;
   isReposted?: boolean;
+  replyToAuthor?: PostAuthorDto | null;
 }
 
 export interface ReplyFeedItemDto {

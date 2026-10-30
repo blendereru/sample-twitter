@@ -204,7 +204,10 @@ public class PostService : IPostService
                 p.Reposts.Count,
                 p.Replies.Count,
                 viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
-                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
+                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value),
+                p.Reply == null
+                    ? null
+                    : new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email)))
             .SingleOrDefaultAsync(ct);
 
         if (post is null)
@@ -247,11 +250,14 @@ public class PostService : IPostService
                         p.Reply.CreatedAt,
                         p.Reply.UpdatedAt,
                         new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email),
-                        ReplyId: null,
+                        p.Reply.ReplyId,
                         p.Reply.Reposts.Count,
                         p.Reply.Replies.Count,
                         viewerUserId.HasValue && p.Reply.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
-                        viewerUserId.HasValue && p.Reply.Reposts.Any(r => r.UserId == viewerUserId.Value)),
+                        viewerUserId.HasValue && p.Reply.Reposts.Any(r => r.UserId == viewerUserId.Value),
+                        p.Reply.Reply == null
+                            ? null
+                            : new PostAuthorResult(p.Reply.Reply.UserId, p.Reply.Reply.User.Email)),
                 p.Reposts.Count,
                 p.Replies.Count,
                 viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
@@ -377,7 +383,10 @@ public class PostService : IPostService
                 b.Post.ReplyId,
                 b.Post.Reposts.Count,
                 b.Post.Replies.Count,
-                b.Post.Reposts.Any(r => r.UserId == userId)))
+                b.Post.Reposts.Any(r => r.UserId == userId),
+                b.Post.Reply == null
+                    ? null
+                    : new PostAuthorResult(b.Post.Reply.UserId, b.Post.Reply.User.Email)))
             .ToListAsync(ct);
     }
 

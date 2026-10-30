@@ -7,7 +7,7 @@ import { editPost, deletePost, repostPost, undoRepost, bookmarkPost, undoBookmar
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import ImageLightbox from '@/components/common/ImageLightbox.vue';
-import type { RepostResponse, BookmarkResponse } from '@/types/api';
+import type { RepostResponse, BookmarkResponse, PostAuthorDto } from '@/types/api';
 
 const props = defineProps<{
   id: number;
@@ -27,6 +27,8 @@ const props = defineProps<{
   isReposted?: boolean;
   isBookmarked?: boolean;
   isFocused?: boolean;
+  replyId?: number | null;
+  replyToAuthor?: PostAuthorDto | null;
 }>();
 
 const emit = defineEmits<{
@@ -710,6 +712,23 @@ async function handleSave() {
       </div>
 
       <template v-else>
+        <div
+          v-if="replyId"
+          class="text-xs text-neutral-500 flex items-center gap-1 -mt-0.5"
+        >
+          <span>Replying to</span>
+          <span
+            v-if="replyToAuthor"
+            @click.stop="goToProfile(replyToAuthor.id)"
+            class="text-sky-500 font-medium hover:underline cursor-pointer"
+          >
+            @{{ replyToAuthor.email.split('@')[0] }}
+          </span>
+          <span v-else class="text-neutral-500 italic">
+            a deleted post
+          </span>
+        </div>
+
         <p
           v-if="content"
           :class="[

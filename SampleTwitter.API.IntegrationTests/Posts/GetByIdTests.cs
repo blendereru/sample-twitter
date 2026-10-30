@@ -1,12 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.Extensions.DependencyInjection;
-using SampleTwitter.API.Abstractions;
-using SampleTwitter.API.Data;
-using SampleTwitter.API.DTOs.RequestDTOs;
 using SampleTwitter.API.DTOs.ResponseDTOs;
 using SampleTwitter.API.IntegrationTests.Infrastructure;
-using SampleTwitter.API.Models;
 
 namespace SampleTwitter.API.IntegrationTests.Posts;
 
@@ -153,6 +148,9 @@ public class GetByIdTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<PostResponse>();
         Assert.NotNull(body);
         Assert.Equal(parent.Id, body.ReplyId);
+        Assert.NotNull(body.ReplyToAuthor);
+        Assert.Equal(user.Id, body.ReplyToAuthor.Id);
+        Assert.Equal(user.Email, body.ReplyToAuthor.Email);
     }
 
     [Fact]

@@ -140,14 +140,15 @@ public class GetBookmarksTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task BookmarkedReply_ReturnsReplyIdOfParentPost()
+    public async Task BookmarkedReply_ReturnsReplyIdAndParentAuthor()
     {
         // Arrange
-        var author = await SeedUser("author@example.com", "Sup3rSecret1!");
+        var parentAuthor = await SeedUser("parent@example.com", "Sup3rSecret1!");
+        var replyAuthor = await SeedUser("replier@example.com", "Sup3rSecret1!");
         var (owner, ownerCookie) = await SeedAndSignIn("owner@example.com", "Sup3rSecret1!");
 
-        var parent = await SeedPost(author.Id, "Parent post");
-        var reply = await SeedReply(author.Id, parent.Id, "Reply to parent");
+        var parent = await SeedPost(parentAuthor.Id, "Parent post");
+        var reply = await SeedReply(replyAuthor.Id, parent.Id, "Reply to parent");
 
         await SeedBookmark(owner.Id, reply.Id);
 
@@ -161,6 +162,35 @@ public class GetBookmarksTests : IntegrationTestBase
         var item = Assert.Single(body);
         Assert.Equal(reply.Id, item.Id);
         Assert.Equal(parent.Id, item.ReplyId);
+        Assert.NotNull(item.ReplyToAuthor);
+        Assert.Equal(parentAuthor.Id, item.ReplyToAuthor.Id);
+        Assert.Equal(parentAuthor.Email, item.ReplyToAuthor.Email);
+    }
+
+    [Fact]
+    public async Task BookmarkedReply_WhenParentPostIsSoftDeleted_ReturnsReplyIdWithNullReplyToAuthor()
+    {
+        // Arrange
+        var parentAuthor = await SeedUser("parent@example.com", "Sup3rSecret1!");
+        var replyAuthor = await SeedUser("replier@example.com", "Sup3rSecret1!");
+        var (owner, ownerCookie) = await SeedAndSignIn("owner@example.com", "Sup3rSecret1!");
+
+        var deletedParent = await SeedPost(parentAuthor.Id, "Deleted parent post", isDeleted: true);
+        var reply = await SeedReply(replyAuthor.Id, deletedParent.Id, "Reply to deleted parent");
+
+        await SeedBookmark(owner.Id, reply.Id);
+
+        // Act
+        var response = await SendGetBookmarksRequest(ownerCookie);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<List<PostResponse>>();
+        Assert.NotNull(body);
+        var item = Assert.Single(body);
+        Assert.Equal(reply.Id, item.Id);
+        Assert.Equal(deletedParent.Id, item.ReplyId);
+        Assert.Null(item.ReplyToAuthor);
     }
 
     [Fact]

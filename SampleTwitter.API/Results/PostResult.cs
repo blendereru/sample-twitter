@@ -11,4 +11,5 @@ public record PostResult(
     int RepostCount,
     int ReplyCount,
     bool IsBookmarked = false,
-    bool IsReposted = false);
+    bool IsReposted = false,
+    PostAuthorResult? ReplyToAuthor = null);

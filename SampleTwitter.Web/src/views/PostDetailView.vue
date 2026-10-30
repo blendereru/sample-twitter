@@ -391,6 +391,23 @@ watch(
             <span class="text-neutral-500 hover:underline">{{ formatDate(parentPost.createdAt) }}</span>
           </div>
 
+          <div
+            v-if="parentPost.replyId"
+            class="text-xs text-neutral-500 flex items-center gap-1 -mt-0.5"
+          >
+            <span>Replying to</span>
+            <span
+              v-if="parentPost.replyToAuthor"
+              @click.stop="router.push(`/profile/${parentPost.replyToAuthor.id}`)"
+              class="text-sky-500 font-medium hover:underline cursor-pointer"
+            >
+              @{{ parentPost.replyToAuthor.email.split('@')[0] }}
+            </span>
+            <span v-else class="text-neutral-500 italic">
+              a deleted post
+            </span>
+          </div>
+
           <p v-if="parentPost.text" class="text-sm leading-relaxed text-neutral-300 whitespace-pre-line">
             {{ parentPost.text }}
           </p>
@@ -430,6 +447,8 @@ watch(
         :updated-at="post.updatedAt"
         :retweets="post.repostCount"
         :replies="replies.length"
+        :reply-id="post.replyId"
+        :reply-to-author="post.replyToAuthor ?? parentPost?.author ?? null"
         :is-reposted="Boolean(post.isReposted) || myRepostedIds.has(post.id)"
         :is-bookmarked="Boolean(post.isBookmarked) || myBookmarkedIds.has(post.id)"
         :is-focused="true"
@@ -558,6 +577,8 @@ watch(
           :updated-at="reply.updatedAt"
           :retweets="reply.repostCount"
           :replies="reply.replyCount"
+          :reply-id="reply.replyId ?? post.id"
+          :reply-to-author="post.author"
           :is-reposted="Boolean(reply.isReposted) || myRepostedIds.has(reply.id)"
           :is-bookmarked="Boolean(reply.isBookmarked) || myBookmarkedIds.has(reply.id)"
           @updated="handleReplyUpdated"
