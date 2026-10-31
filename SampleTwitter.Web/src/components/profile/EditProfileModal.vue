@@ -115,6 +115,8 @@ async function handleSaveProfile() {
       profileFieldErrors.value.username = parsed.fieldErrors.Username[0];
     } else if (parsed.fieldErrors?.ImageUrl?.length) {
       profileError.value = parsed.fieldErrors.ImageUrl[0];
+    } else if (parsed.status === 409) {
+      profileFieldErrors.value.username = parsed.detail || 'This username is already taken.';
     } else {
       profileError.value = parsed.detail || parsed.message || 'Failed to update profile.';
     }

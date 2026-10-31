@@ -53,6 +53,7 @@ public class EditProfileTests : IntegrationTestBase
         var updated = db.Users.Single(u => u.Id == user.Id);
 
         Assert.Equal("PersistedUser", updated.Username);
+        Assert.Equal("persisteduser", updated.NormalizedUsername);
         Assert.Equal(avatarUrl, updated.ImageUrl);
         Assert.NotNull(updated.UpdatedAt);
         Assert.Equal(user.Email, updated.Email);
@@ -97,7 +98,7 @@ public class EditProfileTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ValidEdit_DuplicateUsernameAcrossTwoUsers_Returns200ForBoth()
+    public async Task DuplicateUsernameAcrossTwoUsers_Returns409ConflictWithProblemDetails()
     {
         // Arrange
         var (user1, cookie1) = await SeedAndSignIn("user1@example.com", "Sup3rSecret1!");
@@ -106,8 +107,75 @@ public class EditProfileTests : IntegrationTestBase
         // Act
         var response1 = await SendEditProfileRequest(cookie1, user1.Id,
             new EditProfileRequest { Username = "SameDisplayName" });
+        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
+
         var response2 = await SendEditProfileRequest(cookie2, user2.Id,
             new EditProfileRequest { Username = "SameDisplayName" });
+
+        // Assert
+        await response2.AssertProblemDetails(HttpStatusCode.Conflict);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var user2Db = db.Users.Single(u => u.Id == user2.Id);
+        Assert.Null(user2Db.Username);
+        Assert.Null(user2Db.NormalizedUsername);
+    }
+
+    [Fact]
+    public async Task DuplicateUsername_CaseInsensitiveMatch_Returns409ConflictWithProblemDetails()
+    {
+        // Arrange
+        var (user1, cookie1) = await SeedAndSignIn("user1@example.com", "Sup3rSecret1!");
+        var (user2, cookie2) = await SeedAndSignIn("user2@example.com", "Sup3rSecret1!");
+
+        // Act
+        var response1 = await SendEditProfileRequest(cookie1, user1.Id,
+            new EditProfileRequest { Username = "CoolUser" });
+        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
+
+        var response2 = await SendEditProfileRequest(cookie2, user2.Id,
+            new EditProfileRequest { Username = "COOLUSER" });
+
+        // Assert
+        await response2.AssertProblemDetails(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task SameUser_CanKeepOrChangeCaseOfOwnUsername_Succeeds()
+    {
+        // Arrange
+        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
+
+        // Set initial username
+        var response1 = await SendEditProfileRequest(cookie, user.Id,
+            new EditProfileRequest { Username = "MyName" });
+        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
+
+        // Act - same user updates profile changing case and adding image
+        var response2 = await SendEditProfileRequest(cookie, user.Id,
+            new EditProfileRequest { Username = "myname", ImageUrl = "https://example.com/avatar.png" });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response2.StatusCode);
+        var body = await response2.Content.ReadFromJsonAsync<EditProfileResponse>();
+        Assert.NotNull(body);
+        Assert.Equal("myname", body.Username);
+        Assert.Equal("https://example.com/avatar.png", body.ImageUrl);
+    }
+
+    [Fact]
+    public async Task MultipleUsers_CanHaveNullUsername_Succeeds()
+    {
+        // Arrange
+        var (user1, cookie1) = await SeedAndSignIn("user1@example.com", "Sup3rSecret1!");
+        var (user2, cookie2) = await SeedAndSignIn("user2@example.com", "Sup3rSecret1!");
+
+        // Act - both set only ImageUrl without a username
+        var response1 = await SendEditProfileRequest(cookie1, user1.Id,
+            new EditProfileRequest { Username = null, ImageUrl = "https://example.com/img1.png" });
+        var response2 = await SendEditProfileRequest(cookie2, user2.Id,
+            new EditProfileRequest { Username = null, ImageUrl = "https://example.com/img2.png" });
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response1.StatusCode);

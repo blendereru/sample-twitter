@@ -12,6 +12,10 @@ public class User
     public long Id { get; private set; }
     public string Email { get; private set; } = null!;
     public string? Username { get; private set; }
+    /// <summary>
+    /// Case-insensitive form of <see cref="Username"/> used to enforce uniqueness across accounts.
+    /// </summary>
+    public string? NormalizedUsername { get; private set; }
     public string? ImageUrl { get; private set; }
     public string PasswordHash { get; private set; } = null!;
     public bool EmailConfirmed { get; private set; }
@@ -34,6 +38,15 @@ public class User
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         return email.Trim().ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Canonical form of a username used for case-insensitive uniqueness checks.
+    /// </summary>
+    public static string NormalizeUsername(string username)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        return username.Trim().ToLowerInvariant();
     }
 
     /// <summary>
@@ -87,6 +100,7 @@ public class User
 
     /// <summary>
     /// Replaces the profile details. The profile must still contain a username or an image afterwards.
+    /// Uniqueness of the username is enforced by the caller / database.
     /// </summary>
     public void UpdateProfile(string? username, string? imageUrl, DateTimeOffset? now = null)
     {
@@ -104,6 +118,7 @@ public class User
         }
 
         Username = normalizedUsername;
+        NormalizedUsername = normalizedUsername is null ? null : NormalizeUsername(normalizedUsername);
         ImageUrl = normalizedImageUrl;
         UpdatedAt = now ?? DateTimeOffset.UtcNow;
     }

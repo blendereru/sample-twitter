@@ -148,9 +148,33 @@ public class AccountService : IAccountService
             throw new ForbiddenException($"User {currentUserId} attempted to edit profile of user {id}.");
         }
 
+        var normalizedUsername = string.IsNullOrWhiteSpace(request.Username)
+            ? null
+            : User.NormalizeUsername(request.Username);
+
+        if (normalizedUsername is not null)
+        {
+            var usernameTaken = await _applicationContext.Users
+                .AnyAsync(u => u.Id != id && u.NormalizedUsername == normalizedUsername, ct);
+
+            if (usernameTaken)
+            {
+                _logger.LogWarning("Edit profile failed — username '{Username}' is already taken", request.Username);
+                throw new UsernameTakenException($"Username '{request.Username}' is already taken.");
+            }
+        }
+
         user.UpdateProfile(request.Username, request.ImageUrl);
 
-        await _applicationContext.SaveChangesAsync(ct);
+        try
+        {
+            await _applicationContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            _logger.LogWarning(ex, "Race condition: duplicate username detected during edit profile for user {UserId}", id);
+            throw new UsernameTakenException($"Username '{request.Username}' is already taken (race condition).");
+        }
 
         _logger.LogInformation("User {UserId} profile edited", user.Id);
 

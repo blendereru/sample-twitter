@@ -145,6 +145,7 @@ public class UsersController : ControllerBase
     /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
     /// <response code="403">The authenticated user is attempting to edit another user's profile.</response>
     /// <response code="404">No user exists with the given ID.</response>
+    /// <response code="409">The specified username is already taken by another account.</response>
     /// <response code="500">An unexpected error occurred while processing the request.</response>
     [Authorize]
     [HttpPut("{id:long}")]
@@ -154,6 +155,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> EditProfile(long id, EditProfileRequest request, CancellationToken ct)
     {

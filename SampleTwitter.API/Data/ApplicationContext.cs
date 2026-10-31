@@ -20,6 +20,8 @@ public class ApplicationContext : DbContext
         {
             builder.HasIndex(u => u.Email).IsUnique();
             builder.Property(u => u.Username).HasMaxLength(User.MaxUsernameLength);
+            builder.Property(u => u.NormalizedUsername).HasMaxLength(User.MaxUsernameLength);
+            builder.HasIndex(u => u.NormalizedUsername).IsUnique();
         });
 
         modelBuilder.Entity<Repost>(builder =>

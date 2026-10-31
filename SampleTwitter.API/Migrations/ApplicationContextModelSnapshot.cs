@@ -186,6 +186,10 @@ namespace SampleTwitter.API.Migrations
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("NormalizedUsername")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
@@ -203,6 +207,9 @@ namespace SampleTwitter.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedUsername")
                         .IsUnique();
 
                     b.ToTable("Users");

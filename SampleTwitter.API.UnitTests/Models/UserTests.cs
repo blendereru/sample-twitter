@@ -30,6 +30,29 @@ public class UserTests
         Assert.ThrowsAny<ArgumentException>(() => User.NormalizeEmail(invalidEmail!));
     }
 
+    [Theory]
+    [InlineData("alice", "alice")]
+    [InlineData("  Alice_99  ", "alice_99")]
+    [InlineData("\tBob.Jones\n", "bob.jones")]
+    public void NormalizeUsername_WithValidUsername_TrimsAndLowercasesInvariant(string input, string expected)
+    {
+        // Act
+        var normalized = User.NormalizeUsername(input);
+
+        // Assert
+        Assert.Equal(expected, normalized);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NormalizeUsername_WhenNullOrWhitespace_ThrowsArgumentException(string? invalidUsername)
+    {
+        // Act & Assert
+        Assert.ThrowsAny<ArgumentException>(() => User.NormalizeUsername(invalidUsername!));
+    }
+
     [Fact]
     public void Register_WithValidArguments_CreatesUnconfirmedUserWithNormalizedEmail()
     {
@@ -42,6 +65,7 @@ public class UserTests
         Assert.False(user.EmailConfirmed);
         Assert.Equal(FixedNow, user.RegisteredAt);
         Assert.Null(user.Username);
+        Assert.Null(user.NormalizedUsername);
         Assert.Null(user.ImageUrl);
         Assert.Null(user.UpdatedAt);
     }
@@ -127,6 +151,7 @@ public class UserTests
 
         // Assert
         Assert.Equal("alice_dev", user.Username);
+        Assert.Equal("alice_dev", user.NormalizedUsername);
         Assert.Equal("https://example.com/avatar.png", user.ImageUrl);
         Assert.Equal(editTime, user.UpdatedAt);
         Assert.Equal("user@example.com", user.Email);
@@ -147,6 +172,7 @@ public class UserTests
 
         // Assert
         Assert.Null(user.Username);
+        Assert.Null(user.NormalizedUsername);
         Assert.Equal("https://example.com/new.png", user.ImageUrl);
     }
 
@@ -162,6 +188,7 @@ public class UserTests
 
         // Assert
         Assert.Equal("Alice", user.Username);
+        Assert.Equal("alice", user.NormalizedUsername);
         Assert.Null(user.ImageUrl);
     }
 
@@ -177,6 +204,7 @@ public class UserTests
 
         // Assert
         Assert.Equal(maxUsername, user.Username);
+        Assert.Equal(maxUsername.ToLowerInvariant(), user.NormalizedUsername);
     }
 
     [Theory]
@@ -197,6 +225,7 @@ public class UserTests
             user.UpdateProfile(username, imageUrl, FixedNow.AddMinutes(10)));
 
         Assert.Equal("InitialName", user.Username);
+        Assert.Equal("initialname", user.NormalizedUsername);
         Assert.Equal("https://example.com/initial.png", user.ImageUrl);
         Assert.Equal(FixedNow, user.UpdatedAt);
     }
@@ -215,6 +244,7 @@ public class UserTests
 
         Assert.Equal("username", ex.ParamName);
         Assert.Equal("InitialName", user.Username);
+        Assert.Equal("initialname", user.NormalizedUsername);
     }
 
     [Fact]
@@ -234,6 +264,7 @@ public class UserTests
         Assert.Equal(changeTime, user.UpdatedAt);
         Assert.Equal("user@example.com", user.Email);
         Assert.Equal("Alice", user.Username);
+        Assert.Equal("alice", user.NormalizedUsername);
         Assert.Equal("https://example.com/alice.png", user.ImageUrl);
         Assert.True(user.EmailConfirmed);
         Assert.Equal(FixedNow, user.RegisteredAt);
@@ -257,6 +288,7 @@ public class UserTests
         Assert.Equal(changeTime, user.UpdatedAt);
         Assert.Equal("hash", user.PasswordHash);
         Assert.Equal("Alice", user.Username);
+        Assert.Equal("alice", user.NormalizedUsername);
         Assert.Equal("https://example.com/alice.png", user.ImageUrl);
         Assert.Equal(FixedNow, user.RegisteredAt);
     }
