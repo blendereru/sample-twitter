@@ -28,6 +28,11 @@ export async function getUserReplies(userId: number): Promise<ReplyFeedResponse>
   return response.data;
 }
 
+export async function getUserReposts(userId: number): Promise<PostResponse[]> {
+  const response = await apiClient.get<PostResponse[]>(`/users/${userId}/reposts`);
+  return response.data;
+}
+
 export async function getUserBookmarks(): Promise<PostResponse[]> {
   const response = await apiClient.get<PostResponse[]>('/users/bookmarks');
   return response.data;

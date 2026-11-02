@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare } from 'lucide-vue-next';
+import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare, Repeat2 } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import EditProfileModal from '@/components/profile/EditProfileModal.vue';
 import ImageLightbox from '@/components/common/ImageLightbox.vue';
-import { getUser, getUserPosts, getUserReplies } from '@/api/users';
+import { getUser, getUserPosts, getUserReplies, getUserReposts } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { PostFeedItemDto, ReplyFeedItemDto, PostAuthorDto, RepostResponse, BookmarkResponse, UserResponse } from '@/types/api';
+import type { PostFeedItemDto, ReplyFeedItemDto, PostResponse, PostAuthorDto, RepostResponse, BookmarkResponse, UserResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -33,10 +33,12 @@ const userInfo = ref<UserResponse | null>(null);
 const showEditModal = ref(false);
 const posts = ref<PostFeedItemDto[]>([]);
 const replies = ref<ReplyFeedItemDto[]>([]);
+const reposts = ref<PostResponse[]>([]);
 const postsLoaded = ref(false);
 const repliesLoaded = ref(false);
+const repostsLoaded = ref(false);
 const profileAuthor = ref<PostAuthorDto | null>(null);
-const activeTab = ref<'posts' | 'replies' | 'highlights' | 'media' | 'likes'>('posts');
+const activeTab = ref<'posts' | 'replies' | 'reposts' | 'highlights' | 'media' | 'likes'>('posts');
 
 const profileEmail = computed(() => {
   if (userInfo.value?.email) {
@@ -92,6 +94,10 @@ const headerCountText = computed(() => {
     const count = replies.value.length;
     return `${count} ${count === 1 ? 'reply' : 'replies'}`;
   }
+  if (activeTab.value === 'reposts') {
+    const count = reposts.value.length;
+    return `${count} ${count === 1 ? 'repost' : 'reposts'}`;
+  }
   const count = posts.value.length;
   return `${count} ${count === 1 ? 'post' : 'posts'}`;
 });
@@ -136,6 +142,16 @@ function getAvatar(userId: number): string {
     : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80';
 }
 
+function getAuthorDisplayName(author: PostAuthorDto): string {
+  if (author.id === targetUserId.value && userInfo.value?.username) {
+    return userInfo.value.username;
+  }
+  if (authStore.currentUserId && Number(authStore.currentUserId) === author.id && authStore.currentUsername) {
+    return authStore.currentUsername;
+  }
+  return author.email.split('@')[0];
+}
+
 function handleProfileUpdated(payload: { username?: string | null; imageUrl?: string | null; updatedAt?: string | null }) {
   if (userInfo.value) {
     userInfo.value = {
@@ -147,7 +163,13 @@ function handleProfileUpdated(payload: { username?: string | null; imageUrl?: st
   }
 }
 
-async function fetchFeed(tab: 'posts' | 'replies' = activeTab.value === 'replies' ? 'replies' : 'posts', options: { silent?: boolean } = {}) {
+function getActiveFeedTab(): 'posts' | 'replies' | 'reposts' {
+  if (activeTab.value === 'replies') return 'replies';
+  if (activeTab.value === 'reposts') return 'reposts';
+  return 'posts';
+}
+
+async function fetchFeed(tab: 'posts' | 'replies' | 'reposts' = getActiveFeedTab(), options: { silent?: boolean } = {}) {
   if (!targetUserId.value || isNaN(targetUserId.value)) {
     error.value = 'Invalid user ID.';
     loading.value = false;
@@ -172,6 +194,10 @@ async function fetchFeed(tab: 'posts' | 'replies' = activeTab.value === 'replies
       if (!profileAuthor.value) {
         profileAuthor.value = response.author || null;
       }
+    } else if (tab === 'reposts') {
+      const response = await getUserReposts(targetUserId.value);
+      reposts.value = response || [];
+      repostsLoaded.value = true;
     } else {
       const response = await getUserPosts(targetUserId.value);
       posts.value = response.items || [];
@@ -195,12 +221,14 @@ async function fetchFeed(tab: 'posts' | 'replies' = activeTab.value === 'replies
   }
 }
 
-function switchTab(tab: 'posts' | 'replies' | 'highlights' | 'media' | 'likes') {
+function switchTab(tab: 'posts' | 'replies' | 'reposts' | 'highlights' | 'media' | 'likes') {
   activeTab.value = tab;
   if (tab === 'posts' && !postsLoaded.value) {
     fetchFeed('posts');
   } else if (tab === 'replies' && !repliesLoaded.value) {
     fetchFeed('replies');
+  } else if (tab === 'reposts' && !repostsLoaded.value) {
+    fetchFeed('reposts');
   }
 }
 
@@ -215,6 +243,9 @@ function handlePostBookmarked(response: BookmarkResponse) {
   for (const r of replies.value) {
     if (r.id === response.postId) r.isBookmarked = true;
   }
+  for (const rep of reposts.value) {
+    if (rep.id === response.postId) rep.isBookmarked = true;
+  }
 }
 
 function handlePostUndoBookmarked(postId: number) {
@@ -225,6 +256,9 @@ function handlePostUndoBookmarked(postId: number) {
   for (const r of replies.value) {
     if (r.id === postId) r.isBookmarked = false;
   }
+  for (const rep of reposts.value) {
+    if (rep.id === postId) rep.isBookmarked = false;
+  }
 }
 
 function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
@@ -234,10 +268,17 @@ function handlePostUpdated(updated: { id: number; text?: string; imageUrl?: stri
     item.imageUrl = updated.imageUrl;
     item.updatedAt = updated.updatedAt || new Date().toISOString();
   }
+  const repostItem = reposts.value.find(r => r.id === updated.id);
+  if (repostItem) {
+    repostItem.text = updated.text;
+    repostItem.imageUrl = updated.imageUrl;
+    repostItem.updatedAt = updated.updatedAt || new Date().toISOString();
+  }
 }
 
 function handlePostDeleted(id: number) {
   posts.value = posts.value.filter(p => p.id !== id);
+  reposts.value = reposts.value.filter(r => r.id !== id);
 }
 
 function handleReplyUpdated(updated: { id: number; text?: string; imageUrl?: string; updatedAt?: string }) {
@@ -247,10 +288,17 @@ function handleReplyUpdated(updated: { id: number; text?: string; imageUrl?: str
     item.imageUrl = updated.imageUrl;
     item.updatedAt = updated.updatedAt || new Date().toISOString();
   }
+  const repostItem = reposts.value.find(r => r.id === updated.id);
+  if (repostItem) {
+    repostItem.text = updated.text;
+    repostItem.imageUrl = updated.imageUrl;
+    repostItem.updatedAt = updated.updatedAt || new Date().toISOString();
+  }
 }
 
 function handleReplyDeleted(id: number) {
   replies.value = replies.value.filter(r => r.id !== id);
+  reposts.value = reposts.value.filter(r => r.id !== id);
 }
 
 function handlePostReposted(response: RepostResponse) {
@@ -268,6 +316,15 @@ function handlePostReposted(response: RepostResponse) {
       r.isReposted = true;
     }
   }
+  for (const rep of reposts.value) {
+    if (rep.id === response.postId) {
+      rep.repostCount = (rep.repostCount || 0) + 1;
+      rep.isReposted = true;
+    }
+  }
+  if (isMyProfile.value) {
+    repostsLoaded.value = false;
+  }
 }
 
 function handlePostUndoReposted(postId: number) {
@@ -283,6 +340,16 @@ function handlePostUndoReposted(postId: number) {
     if (r.id === postId) {
       r.repostCount = Math.max(0, (r.repostCount || 0) - 1);
       r.isReposted = false;
+    }
+  }
+  if (isMyProfile.value) {
+    reposts.value = reposts.value.filter(rep => rep.id !== postId);
+  } else {
+    for (const rep of reposts.value) {
+      if (rep.id === postId) {
+        rep.repostCount = Math.max(0, (rep.repostCount || 0) - 1);
+        rep.isReposted = false;
+      }
     }
   }
 }
@@ -305,9 +372,11 @@ watch(
     userInfo.value = null;
     postsLoaded.value = false;
     repliesLoaded.value = false;
+    repostsLoaded.value = false;
     posts.value = [];
     replies.value = [];
-    fetchFeed(activeTab.value === 'replies' ? 'replies' : 'posts');
+    reposts.value = [];
+    fetchFeed(getActiveFeedTab());
   }
 );
 </script>
@@ -445,6 +514,20 @@ watch(
           </button>
 
           <button
+            @click="switchTab('reposts')"
+            :class="[
+              'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
+              activeTab === 'reposts' ? 'text-white font-bold' : 'text-neutral-500'
+            ]"
+          >
+            Reposts
+            <div
+              v-if="activeTab === 'reposts'"
+              class="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-sky-500 rounded-full"
+            ></div>
+          </button>
+
+          <button
             @click="switchTab('highlights')"
             :class="[
               'flex-1 min-w-[80px] py-3.5 text-center hover:bg-neutral-900/60 transition-colors relative cursor-pointer',
@@ -496,7 +579,7 @@ watch(
       <div v-else-if="error" class="p-6 text-center">
         <p class="text-sm text-red-400 mb-3">{{ error }}</p>
         <button
-          @click="() => fetchFeed(activeTab === 'replies' ? 'replies' : 'posts')"
+          @click="() => fetchFeed(getActiveFeedTab())"
           class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-700 hover:bg-neutral-800 text-xs font-semibold text-neutral-300 transition-colors cursor-pointer"
         >
           <RefreshCw class="w-3.5 h-3.5" />
@@ -504,8 +587,8 @@ watch(
         </button>
       </div>
 
-      <!-- Non-Posts / Non-Replies Tab Empty State -->
-      <div v-else-if="activeTab !== 'posts' && activeTab !== 'replies'" class="flex flex-col items-center justify-center p-12 text-center">
+      <!-- Non-Posts / Non-Replies / Non-Reposts Tab Empty State -->
+      <div v-else-if="activeTab !== 'posts' && activeTab !== 'replies' && activeTab !== 'reposts'" class="flex flex-col items-center justify-center p-12 text-center">
         <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
           <MessageSquare class="w-8 h-8 text-neutral-600" />
         </div>
@@ -699,6 +782,60 @@ watch(
                 class="!border-b-0 !pt-2"
               />
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reposts Tab -->
+      <div v-else-if="activeTab === 'reposts'" class="flex flex-col">
+        <!-- Reposts Tab Empty State -->
+        <div v-if="reposts.length === 0" class="flex flex-col items-center justify-center p-12 text-center">
+          <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-4">
+            <Repeat2 class="w-8 h-8 text-neutral-600" />
+          </div>
+          <h3 class="text-xl font-bold mb-1">No reposts yet</h3>
+          <p class="text-neutral-500 text-sm max-w-xs">
+            {{ isMyProfile ? "When you repost posts, they will show up here." : "When this user reposts posts, they will show up here." }}
+          </p>
+        </div>
+
+        <!-- Reposts List -->
+        <div v-else class="flex flex-col">
+          <div
+            v-for="repost in reposts"
+            :key="repost.id"
+            class="flex flex-col border-b border-neutral-800"
+          >
+            <div class="px-4 pt-2.5 -mb-2 flex items-center gap-2 text-xs font-semibold text-neutral-500">
+              <Repeat2 class="w-3.5 h-3.5 text-neutral-500 ml-6" />
+              <span>{{ isMyProfile ? 'You reposted' : `${profileDisplayName} reposted` }}</span>
+            </div>
+
+            <TweetCard
+              :id="repost.id"
+              :user-id="repost.author.id"
+              :author="getAuthorDisplayName(repost.author)"
+              :handle="'@' + repost.author.email"
+              :avatar="getAvatar(repost.author.id)"
+              :content="repost.text || ''"
+              :image-url="repost.imageUrl"
+              :timestamp="formatDate(repost.createdAt)"
+              :updated-at="repost.updatedAt"
+              :retweets="repost.repostCount"
+              :replies="repost.replyCount"
+              :reply-id="repost.replyId"
+              :reply-to-author="repost.replyToAuthor"
+              :can-edit="authStore.isAuthenticated && Number(authStore.currentUserId) === repost.author.id"
+              :is-reposted="Boolean(repost.isReposted) || myRepostedPostIds.has(repost.id)"
+              :is-bookmarked="Boolean(repost.isBookmarked) || myBookmarkedPostIds.has(repost.id)"
+              @updated="handlePostUpdated"
+              @delete="handlePostDeleted"
+              @reposted="handlePostReposted"
+              @undo-repost="handlePostUndoReposted"
+              @bookmarked="handlePostBookmarked"
+              @undo-bookmark="handlePostUndoBookmarked"
+              class="!border-b-0"
+            />
           </div>
         </div>
       </div>

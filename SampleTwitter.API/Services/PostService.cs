@@ -189,6 +189,36 @@ public class PostService : IPostService
         _logger.LogInformation("Repost for post {PostId} by user {UserId} undone", postId, userId);
     }
 
+    public async Task<List<RepostFeedResult>> GetRepostFeed(long userId, long? viewerUserId = null, CancellationToken ct = default)
+    {
+        if (!await _applicationContext.Users.AnyAsync(u => u.Id == userId, ct))
+        {
+            _logger.LogWarning("Repost feed requested for non-existent user {UserId}", userId);
+            throw new UserNotFoundException($"User with id {userId} was not found.");
+        }
+
+        return await _applicationContext.Reposts
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.PostId)
+            .Select(r => new RepostFeedResult(
+                r.Post.Id,
+                r.Post.Text,
+                r.Post.ImageUrl,
+                r.Post.CreatedAt,
+                r.Post.UpdatedAt,
+                new PostAuthorResult(r.Post.UserId, r.Post.User.Email),
+                r.Post.ReplyId,
+                r.Post.Reposts.Count,
+                r.Post.Replies.Count,
+                viewerUserId.HasValue && r.Post.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
+                viewerUserId.HasValue && r.Post.Reposts.Any(rep => rep.UserId == viewerUserId.Value),
+                r.Post.Reply == null
+                    ? null
+                    : new PostAuthorResult(r.Post.Reply.UserId, r.Post.Reply.User.Email)))
+            .ToListAsync(ct);
+    }
+
     public async Task<PostResult> GetById(long id, long? viewerUserId = null, CancellationToken ct = default)
     {
         var post = await _applicationContext.Posts

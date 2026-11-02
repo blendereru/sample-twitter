@@ -76,6 +76,42 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
+    /// Returns the reposted posts feed for the given user.
+    /// </summary>
+    /// <param name="userId">The ID of the user whose repost feed to retrieve.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">Repost feed returned successfully.</response>
+    /// <response code="404">User is not found (an account was deleted or invalid userId)</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [HttpGet("{userId:long}/reposts")]
+    [ProducesResponseType(typeof(List<PostResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetRepostFeed(long userId, CancellationToken ct)
+    {
+        var viewerUserId = GetCurrentUserIdOrNull();
+        var results = await _postService.GetRepostFeed(userId, viewerUserId, ct);
+
+        var response = results.Select(r => new PostResponse(
+            r.Id,
+            r.Text,
+            r.ImageUrl,
+            r.CreatedAt,
+            r.UpdatedAt,
+            new PostAuthorDto(r.Author.Id, r.Author.Email),
+            r.ReplyId,
+            r.RepostCount,
+            r.ReplyCount,
+            r.IsBookmarked,
+            r.IsReposted,
+            r.ReplyToAuthor is null
+                ? null
+                : new PostAuthorDto(r.ReplyToAuthor.Id, r.ReplyToAuthor.Email))).ToList();
+
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Returns the bookmarked posts feed for the currently authenticated user.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
