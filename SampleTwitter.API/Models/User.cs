@@ -8,6 +8,8 @@ public class User
 
     private readonly List<Repost> _reposts = new();
     private readonly List<Bookmark> _bookmarks = new();
+    private readonly List<Follow> _followers = new();
+    private readonly List<Follow> _following = new();
 
     public long Id { get; private set; }
     public string Email { get; private set; } = null!;
@@ -23,6 +25,8 @@ public class User
     public DateTimeOffset? UpdatedAt { get; private set; }
     public IReadOnlyCollection<Repost> Reposts => _reposts;
     public IReadOnlyCollection<Bookmark> Bookmarks => _bookmarks;
+    public IReadOnlyCollection<Follow> Followers => _followers;
+    public IReadOnlyCollection<Follow> Following => _following;
 
     /// <summary>
     /// Used by EF Core for materialization. Application code must use <see cref="Register"/>.

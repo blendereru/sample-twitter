@@ -17,7 +17,7 @@ namespace SampleTwitter.API.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -72,6 +72,26 @@ namespace SampleTwitter.API.Migrations
                     b.HasIndex("UserId", "UsedAt");
 
                     b.ToTable("EmailConfirmationTokens");
+                });
+
+            modelBuilder.Entity("SampleTwitter.API.Models.Follow", b =>
+                {
+                    b.Property<long>("FollowerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FollowingId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("FollowerId", "FollowingId");
+
+                    b.HasIndex("FollowerId", "CreatedAt");
+
+                    b.HasIndex("FollowingId", "CreatedAt");
+
+                    b.ToTable("Follows");
                 });
 
             modelBuilder.Entity("SampleTwitter.API.Models.PasswordResetToken", b =>
@@ -245,6 +265,25 @@ namespace SampleTwitter.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SampleTwitter.API.Models.Follow", b =>
+                {
+                    b.HasOne("SampleTwitter.API.Models.User", "Follower")
+                        .WithMany("Following")
+                        .HasForeignKey("FollowerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SampleTwitter.API.Models.User", "Following")
+                        .WithMany("Followers")
+                        .HasForeignKey("FollowingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Follower");
+
+                    b.Navigation("Following");
+                });
+
             modelBuilder.Entity("SampleTwitter.API.Models.PasswordResetToken", b =>
                 {
                     b.HasOne("SampleTwitter.API.Models.User", "User")
@@ -305,6 +344,10 @@ namespace SampleTwitter.API.Migrations
             modelBuilder.Entity("SampleTwitter.API.Models.User", b =>
                 {
                     b.Navigation("Bookmarks");
+
+                    b.Navigation("Followers");
+
+                    b.Navigation("Following");
 
                     b.Navigation("Reposts");
                 });

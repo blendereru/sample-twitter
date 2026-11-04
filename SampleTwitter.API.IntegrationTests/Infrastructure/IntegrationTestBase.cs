@@ -125,6 +125,17 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return bookmark;
     }
 
+    protected async Task<Follow> SeedFollow(long followerId, long followingId, DateTimeOffset? createdAt = null)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+
+        var follow = Follow.Create(followerId, followingId, createdAt);
+        db.Follows.Add(follow);
+        await db.SaveChangesAsync();
+        return follow;
+    }
+
     protected async Task<long> GetUserId(string cookie)
     {
         var message = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")

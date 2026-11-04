@@ -6,4 +6,7 @@ public record UserResult(
     DateTimeOffset RegisteredAt,
     string? Username = null,
     string? ImageUrl = null,
-    DateTimeOffset? UpdatedAt = null);
+    DateTimeOffset? UpdatedAt = null,
+    int FollowersCount = 0,
+    int FollowingCount = 0,
+    bool IsFollowing = false);

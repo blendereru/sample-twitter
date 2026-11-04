@@ -116,11 +116,22 @@ public class AccountService : IAccountService
         return new LoginResult(user.Id, user.Email);
     }
 
-    public async Task<UserResult> GetUserById(long id, CancellationToken ct = default)
+    public async Task<UserResult> GetUserById(long id, long? viewerUserId = null, CancellationToken ct = default)
     {
         var user = await _applicationContext.Users
             .AsNoTracking()
-            .SingleOrDefaultAsync(u => u.Id == id, ct);
+            .Where(u => u.Id == id)
+            .Select(u => new UserResult(
+                u.Id,
+                u.Email,
+                u.RegisteredAt,
+                u.Username,
+                u.ImageUrl,
+                u.UpdatedAt,
+                u.Followers.Count,
+                u.Following.Count,
+                viewerUserId.HasValue && u.Followers.Any(f => f.FollowerId == viewerUserId.Value)))
+            .SingleOrDefaultAsync(ct);
 
         if (user is null)
         {
@@ -128,7 +139,7 @@ public class AccountService : IAccountService
             throw new UserNotFoundException($"User with id {id} was not found.");
         }
 
-        return new UserResult(user.Id, user.Email, user.RegisteredAt, user.Username, user.ImageUrl, user.UpdatedAt);
+        return user;
     }
 
     public async Task<EditProfileResult> Edit(long id, EditProfileRequest request, long currentUserId, CancellationToken ct = default)
@@ -341,6 +352,74 @@ public class AccountService : IAccountService
         await _applicationContext.SaveChangesAsync(ct);
 
         _logger.LogInformation("Password reset completed for user {UserId}", request.UserId);
+    }
+
+    public async Task<FollowResult> Follow(long followId, long currentUserId, CancellationToken ct = default)
+    {
+        var targetExists = await _applicationContext.Users
+            .AnyAsync(u => u.Id == followId, ct);
+
+        if (!targetExists)
+        {
+            _logger.LogWarning("Follow failed — target user {TargetUserId} not found", followId);
+            throw new UserNotFoundException($"User with id {followId} was not found.");
+        }
+
+        var followerExists = await _applicationContext.Users
+            .AnyAsync(u => u.Id == currentUserId, ct);
+
+        if (!followerExists)
+        {
+            _logger.LogWarning("Follow failed — follower user {FollowerUserId} not found", currentUserId);
+            throw new UserNotFoundException($"User with id {currentUserId} was not found.");
+        }
+
+        var follow = Models.Follow.Create(currentUserId, followId);
+
+        var alreadyFollowing = await _applicationContext.Follows
+            .AnyAsync(f => f.FollowerId == currentUserId && f.FollowingId == followId, ct);
+
+        if (alreadyFollowing)
+        {
+            _logger.LogWarning("Follow failed — user {FollowerId} is already following user {FollowingId}", currentUserId, followId);
+            throw new AlreadyFollowedException($"User {currentUserId} is already following user {followId}.");
+        }
+
+        _applicationContext.Follows.Add(follow);
+
+        try
+        {
+            await _applicationContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            _logger.LogWarning(ex, "Race condition: duplicate follow attempt detected during save from user {FollowerId} to user {FollowingId}", currentUserId, followId);
+            throw new AlreadyFollowedException($"User {currentUserId} is already following user {followId} (race condition).");
+        }
+
+        _logger.LogInformation("User {FollowerId} followed user {FollowingId}", currentUserId, followId);
+
+        return new FollowResult(follow.FollowerId, follow.FollowingId, follow.CreatedAt);
+    }
+
+    public async Task Unfollow(long followId, long currentUserId, CancellationToken ct = default)
+    {
+        var follow = await _applicationContext.Follows
+            .SingleOrDefaultAsync(f => f.FollowerId == currentUserId && f.FollowingId == followId, ct);
+
+        if (follow is null)
+        {
+            _logger.LogWarning(
+                "Unfollow failed — user {FollowerId} is not following user {FollowingId} or user not found",
+                currentUserId,
+                followId);
+            throw new FollowNotFoundException($"Follow relationship from user {currentUserId} to user {followId} was not found.");
+        }
+
+        _applicationContext.Follows.Remove(follow);
+        await _applicationContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation("User {FollowerId} unfollowed user {FollowingId}", currentUserId, followId);
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)

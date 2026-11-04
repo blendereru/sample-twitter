@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare, Re
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import EditProfileModal from '@/components/profile/EditProfileModal.vue';
 import ImageLightbox from '@/components/common/ImageLightbox.vue';
-import { getUser, getUserPosts, getUserReplies, getUserReposts } from '@/api/users';
+import { getUser, getUserPosts, getUserReplies, getUserReposts, followUser, unfollowUser } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import type { PostFeedItemDto, ReplyFeedItemDto, PostResponse, PostAuthorDto, RepostResponse, BookmarkResponse, UserResponse } from '@/types/api';
@@ -150,6 +150,56 @@ function getAuthorDisplayName(author: PostAuthorDto): string {
     return authStore.currentUsername;
   }
   return author.email.split('@')[0];
+}
+
+const isFollowLoading = ref(false);
+const followHover = ref(false);
+
+async function handleToggleFollow() {
+  if (isFollowLoading.value) return;
+
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+
+  if (!userInfo.value) return;
+
+  isFollowLoading.value = true;
+  const currentlyFollowing = Boolean(userInfo.value.isFollowing);
+
+  try {
+    if (currentlyFollowing) {
+      await unfollowUser(targetUserId.value);
+      userInfo.value = {
+        ...userInfo.value,
+        isFollowing: false,
+        followersCount: Math.max(0, (userInfo.value.followersCount ?? 1) - 1),
+      };
+    } else {
+      await followUser(targetUserId.value);
+      userInfo.value = {
+        ...userInfo.value,
+        isFollowing: true,
+        followersCount: (userInfo.value.followersCount ?? 0) + 1,
+      };
+    }
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    if (!currentlyFollowing && parsed.status === 409) {
+      userInfo.value = {
+        ...userInfo.value,
+        isFollowing: true,
+      };
+    } else if (currentlyFollowing && parsed.status === 404) {
+      userInfo.value = {
+        ...userInfo.value,
+        isFollowing: false,
+      };
+    }
+  } finally {
+    isFollowLoading.value = false;
+  }
 }
 
 function handleProfileUpdated(payload: { username?: string | null; imageUrl?: string | null; updatedAt?: string | null }) {
@@ -445,9 +495,20 @@ watch(
               </button>
               <button
                 v-else
-                class="bg-white hover:bg-neutral-200 text-black font-bold text-sm px-5 py-1.5 rounded-full transition-colors"
+                @click="handleToggleFollow"
+                @mouseenter="followHover = true"
+                @mouseleave="followHover = false"
+                :disabled="isFollowLoading"
+                :class="[
+                  'font-bold text-sm px-5 py-1.5 rounded-full transition-colors cursor-pointer min-w-[104px] disabled:opacity-50',
+                  userInfo?.isFollowing
+                    ? followHover
+                      ? 'border border-red-800 bg-red-950/30 text-red-500'
+                      : 'border border-neutral-600 bg-black text-white'
+                    : 'bg-white hover:bg-neutral-200 text-black'
+                ]"
               >
-                Follow
+                {{ userInfo?.isFollowing ? (followHover ? 'Unfollow' : 'Following') : 'Follow' }}
               </button>
             </div>
           </div>
@@ -473,12 +534,12 @@ watch(
           <!-- Following / Followers metrics -->
           <div class="flex items-center gap-4 mt-3 text-sm">
             <div class="hover:underline cursor-pointer">
-              <span class="font-bold text-white">0</span>
+              <span class="font-bold text-white">{{ userInfo?.followingCount ?? 0 }}</span>
               <span class="text-neutral-500 ml-1">Following</span>
             </div>
             <div class="hover:underline cursor-pointer">
-              <span class="font-bold text-white">0</span>
-              <span class="text-neutral-500 ml-1">Followers</span>
+              <span class="font-bold text-white">{{ userInfo?.followersCount ?? 0 }}</span>
+              <span class="text-neutral-500 ml-1">{{ (userInfo?.followersCount ?? 0) === 1 ? 'Follower' : 'Followers' }}</span>
             </div>
           </div>
         </div>

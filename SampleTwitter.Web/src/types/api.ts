@@ -39,6 +39,15 @@ export interface UserResponse {
   username?: string | null;
   imageUrl?: string | null;
   updatedAt?: string | null;
+  followersCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+}
+
+export interface FollowResponse {
+  followerId: number;
+  followingId: number;
+  createdAt: string;
 }
 
 export interface EditProfileRequest {

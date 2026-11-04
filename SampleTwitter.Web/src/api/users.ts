@@ -4,6 +4,7 @@ import type {
   PostResponse,
   ReplyFeedResponse,
   UserResponse,
+  FollowResponse,
   EditProfileRequest,
   EditProfileResponse,
 } from '@/types/api';
@@ -11,6 +12,15 @@ import type {
 export async function getUser(userId: number): Promise<UserResponse> {
   const response = await apiClient.get<UserResponse>(`/users/${userId}`);
   return response.data;
+}
+
+export async function followUser(userId: number): Promise<FollowResponse> {
+  const response = await apiClient.post<FollowResponse>(`/users/${userId}/follow`);
+  return response.data;
+}
+
+export async function unfollowUser(userId: number): Promise<void> {
+  await apiClient.delete(`/users/${userId}/follow`);
 }
 
 export async function editProfile(userId: number, request: EditProfileRequest): Promise<EditProfileResponse> {

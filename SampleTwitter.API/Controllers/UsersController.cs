@@ -165,8 +165,18 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetUser(long id, CancellationToken ct)
     {
-        var user = await _accountService.GetUserById(id, ct);
-        return Ok(new UserResponse(user.Id, user.Email, user.RegisteredAt, user.Username, user.ImageUrl, user.UpdatedAt));
+        var viewerUserId = GetCurrentUserIdOrNull();
+        var user = await _accountService.GetUserById(id, viewerUserId, ct);
+        return Ok(new UserResponse(
+            user.Id,
+            user.Email,
+            user.RegisteredAt,
+            user.Username,
+            user.ImageUrl,
+            user.UpdatedAt,
+            user.FollowersCount,
+            user.FollowingCount,
+            user.IsFollowing));
     }
 
     /// <summary>
@@ -201,6 +211,60 @@ public class UsersController : ControllerBase
         var result = await _accountService.Edit(id, request, currentUserId, ct);
 
         return Ok(new EditProfileResponse(result.Id, result.Username, result.ImageUrl, result.UpdatedAt));
+    }
+
+    /// <summary>
+    /// Follows the specified user for the currently authenticated user.
+    /// </summary>
+    /// <param name="id">The ID of the user to follow.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="200">The user was followed successfully; returns the follow relationship representation.</response>
+    /// <response code="400">The authenticated user attempted to follow themselves.</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">No user exists with the given ID.</response>
+    /// <response code="409">The authenticated user is already following this user.</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpPost("{id:long}/follow")]
+    [ProducesResponseType(typeof(FollowResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Follow(long id, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserId = long.Parse(userIdClaim!);
+
+        var result = await _accountService.Follow(id, currentUserId, ct);
+
+        return Ok(new FollowResponse(result.FollowerId, result.FollowingId, result.CreatedAt));
+    }
+
+    /// <summary>
+    /// Unfollows the specified user for the currently authenticated user.
+    /// </summary>
+    /// <param name="id">The ID of the user to unfollow.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <response code="204">The user was unfollowed successfully.</response>
+    /// <response code="401">The request is not authenticated (no valid auth cookie).</response>
+    /// <response code="404">The follow relationship does not exist (target user not found or not currently followed).</response>
+    /// <response code="500">An unexpected error occurred while processing the request.</response>
+    [Authorize]
+    [HttpDelete("{id:long}/follow")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Unfollow(long id, CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var currentUserId = long.Parse(userIdClaim!);
+
+        await _accountService.Unfollow(id, currentUserId, ct);
+
+        return NoContent();
     }
 
     private long? GetCurrentUserIdOrNull()

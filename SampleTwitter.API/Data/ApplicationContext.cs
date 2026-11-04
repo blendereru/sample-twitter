@@ -13,6 +13,7 @@ public class ApplicationContext : DbContext
     public DbSet<Post> Posts { get; set; } = null!;
     public DbSet<Repost> Reposts { get; set; } = null!;
     public DbSet<Bookmark> Bookmarks { get; set; } = null!;
+    public DbSet<Follow> Follows { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,24 @@ public class ApplicationContext : DbContext
             builder.Property(u => u.Username).HasMaxLength(User.MaxUsernameLength);
             builder.Property(u => u.NormalizedUsername).HasMaxLength(User.MaxUsernameLength);
             builder.HasIndex(u => u.NormalizedUsername).IsUnique();
+        });
+
+        modelBuilder.Entity<Follow>(builder =>
+        {
+            builder.HasKey(f => new { f.FollowerId, f.FollowingId });
+
+            builder.HasOne(f => f.Follower)
+                .WithMany(u => u.Following)
+                .HasForeignKey(f => f.FollowerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(f => f.Following)
+                .WithMany(u => u.Followers)
+                .HasForeignKey(f => f.FollowingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(f => new { f.FollowingId, f.CreatedAt });
+            builder.HasIndex(f => new { f.FollowerId, f.CreatedAt });
         });
 
         modelBuilder.Entity<Repost>(builder =>

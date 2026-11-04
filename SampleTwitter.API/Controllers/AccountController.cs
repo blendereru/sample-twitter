@@ -190,7 +190,7 @@ public class AccountController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var userId = long.Parse(userIdClaim!);
 
-        var result = await _accountService.GetUserById(userId, ct);
+        var result = await _accountService.GetUserById(userId, ct: ct);
 
         return Ok(new MeResponse(result.Id, result.Email, result.RegisteredAt, result.Username, result.ImageUrl, result.UpdatedAt));
     }
