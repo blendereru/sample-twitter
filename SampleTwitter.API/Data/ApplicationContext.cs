@@ -110,14 +110,20 @@ public class ApplicationContext : DbContext
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<Post>()
-                .HasOne(p => p.Reply)
+            builder.HasOne(p => p.Reply)
                 .WithMany(p => p.Replies)
                 .HasForeignKey(p => p.ReplyId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.HasOne(p => p.Quote)
+                .WithMany(p => p.Quotes)
+                .HasForeignKey(p => p.QuoteId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.HasIndex(p => new { p.UserId, p.CreatedAt });
             builder.HasIndex(p => p.ReplyId);
+
+            builder.HasIndex(p => p.QuoteId);
 
             builder.Property(p => p.Text).HasMaxLength(Post.MaxTextLength);
 

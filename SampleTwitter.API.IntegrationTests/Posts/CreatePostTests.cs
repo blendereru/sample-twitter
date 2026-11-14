@@ -222,6 +222,65 @@ public class CreatePostTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task ValidCreate_QuoteExistingPost_Returns201AndPersistsQuoteId()
+    {
+        // Arrange
+        var (author, _) = await SeedAndSignIn("author@example.com", "Sup3rSecret1!");
+        var quotedPost = await SeedPost(userId: author.Id, text: "original post");
+
+        var (quoter, quoterCookie) = await SeedAndSignIn("quoter@example.com", "Sup3rSecret1!");
+        var request = new CreatePostRequest { Text = "my thoughts on this", QuoteId = quotedPost.Id };
+
+        // Act
+        var response = await SendCreateRequest(quoterCookie, request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<CreatePostResponse>();
+        Assert.NotNull(body);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var post = db.Posts.Single(p => p.Id == body.PostId);
+
+        Assert.Equal("my thoughts on this", post.Text);
+        Assert.Equal(quotedPost.Id, post.QuoteId);
+        Assert.Equal(quoter.Id, post.UserId);
+    }
+
+    [Fact]
+    public async Task NonExistentQuoteId_Returns404()
+    {
+        // Arrange
+        var (_, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
+        var request = new CreatePostRequest { Text = "quote nowhere", QuoteId = 999999 };
+
+        // Act
+        var response = await SendCreateRequest(cookie, request);
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task SoftDeletedQuoteId_Returns404()
+    {
+        // Arrange
+        var (author, _) = await SeedAndSignIn("author@example.com", "Sup3rSecret1!");
+        var deletedPost = await SeedPost(userId: author.Id, text: "deleted target", isDeleted: true);
+
+        var (_, quoterCookie) = await SeedAndSignIn("quoter@example.com", "Sup3rSecret1!");
+        var request = new CreatePostRequest { Text = "quoting deleted post", QuoteId = deletedPost.Id };
+
+        // Act
+        var response = await SendCreateRequest(quoterCookie, request);
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task TextExceeds280Characters_Returns400WithTextValidationError()
     {
         // Arrange

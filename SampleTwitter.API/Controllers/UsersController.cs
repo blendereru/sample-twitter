@@ -50,7 +50,17 @@ public class UsersController : ControllerBase
                 i.RepostCount,
                 i.ReplyCount,
                 i.IsBookmarked,
-                i.IsReposted))
+                i.IsReposted,
+                i.QuoteId,
+                i.QuotedPost is null
+                    ? null
+                    : new QuotedPostDto(
+                        i.QuotedPost.Id,
+                        i.QuotedPost.Text,
+                        i.QuotedPost.ImageUrl,
+                        i.QuotedPost.CreatedAt,
+                        i.QuotedPost.UpdatedAt,
+                        new PostAuthorDto(i.QuotedPost.Author.Id, i.QuotedPost.Author.Username))))
             .ToList();
 
         return Ok(new PostFeedResponse(items, new PostAuthorDto(feed.Author.Id, feed.Author.Username)));
@@ -106,7 +116,17 @@ public class UsersController : ControllerBase
             r.IsReposted,
             r.ReplyToAuthor is null
                 ? null
-                : new PostAuthorDto(r.ReplyToAuthor.Id, r.ReplyToAuthor.Username))).ToList();
+                : new PostAuthorDto(r.ReplyToAuthor.Id, r.ReplyToAuthor.Username),
+            r.QuoteId,
+            r.QuotedPost is null
+                ? null
+                : new QuotedPostDto(
+                    r.QuotedPost.Id,
+                    r.QuotedPost.Text,
+                    r.QuotedPost.ImageUrl,
+                    r.QuotedPost.CreatedAt,
+                    r.QuotedPost.UpdatedAt,
+                    new PostAuthorDto(r.QuotedPost.Author.Id, r.QuotedPost.Author.Username)))).ToList();
 
         return Ok(response);
     }
@@ -146,7 +166,17 @@ public class UsersController : ControllerBase
             b.IsReposted,
             b.ReplyToAuthor is null
                 ? null
-                : new PostAuthorDto(b.ReplyToAuthor.Id, b.ReplyToAuthor.Username))).ToList();
+                : new PostAuthorDto(b.ReplyToAuthor.Id, b.ReplyToAuthor.Username),
+            b.QuoteId,
+            b.QuotedPost is null
+                ? null
+                : new QuotedPostDto(
+                    b.QuotedPost.Id,
+                    b.QuotedPost.Text,
+                    b.QuotedPost.ImageUrl,
+                    b.QuotedPost.CreatedAt,
+                    b.QuotedPost.UpdatedAt,
+                    new PostAuthorDto(b.QuotedPost.Author.Id, b.QuotedPost.Author.Username)))).ToList();
 
         return Ok(response);
     }

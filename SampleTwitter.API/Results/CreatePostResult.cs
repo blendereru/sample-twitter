@@ -6,4 +6,5 @@ public record CreatePostResult(
     string? ImageUrl,
     long? ReplyId,
     long UserId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    long? QuoteId = null);

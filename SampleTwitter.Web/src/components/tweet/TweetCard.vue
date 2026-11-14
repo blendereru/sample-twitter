@@ -3,11 +3,11 @@ import { Heart, MessageCircle, Repeat2, Share, Bookmark, Pencil, X, Loader2, Ima
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { editPost, deletePost, repostPost, undoRepost, bookmarkPost, undoBookmark } from '@/api/posts';
+import { createPost, editPost, deletePost, repostPost, undoRepost, bookmarkPost, undoBookmark } from '@/api/posts';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import ImageLightbox from '@/components/common/ImageLightbox.vue';
-import type { RepostResponse, BookmarkResponse, PostAuthorDto } from '@/types/api';
+import type { RepostResponse, BookmarkResponse, PostAuthorDto, QuotedPostDto } from '@/types/api';
 
 const props = defineProps<{
   id: number;
@@ -29,6 +29,8 @@ const props = defineProps<{
   isFocused?: boolean;
   replyId?: number | null;
   replyToAuthor?: PostAuthorDto | null;
+  quoteId?: number | null;
+  quotedPost?: QuotedPostDto | null;
 }>();
 
 const emit = defineEmits<{
@@ -39,6 +41,7 @@ const emit = defineEmits<{
   (e: 'bookmarked', response: BookmarkResponse): void;
   (e: 'undo-bookmark', id: number): void;
   (e: 'reply-click'): void;
+  (e: 'quoted', postId: number): void;
 }>();
 
 const router = useRouter();
@@ -181,12 +184,123 @@ async function executeUndoRepost() {
   }
 }
 
+const showQuoteModal = ref(false);
+const quoteText = ref('');
+const quoteImageUrl = ref('');
+const isQuoting = ref(false);
+const uploadingQuoteImage = ref(false);
+const quoteError = ref<string | null>(null);
+const quoteFileInputRef = ref<HTMLInputElement | null>(null);
+
+const remainingQuoteChars = computed(() => 280 - quoteText.value.length);
+const isQuoteValid = computed(() => {
+  const hasText = quoteText.value.trim().length > 0;
+  const hasImage = quoteImageUrl.value.trim().length > 0;
+  return (hasText || hasImage) && remainingQuoteChars.value >= 0 && !uploadingQuoteImage.value;
+});
+
+function getQuoteAuthorAvatar(userId: number): string {
+  return userId % 2 === 0
+    ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
+    : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80';
+}
+
 function handleQuote() {
   repostMenuOpen.value = false;
-  repostError.value = 'Quote tweets are coming soon!';
-  setTimeout(() => {
-    repostError.value = null;
-  }, 3000);
+
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+
+  if (props.id <= 0) {
+    repostError.value = 'Cannot quote demo tweets.';
+    setTimeout(() => {
+      repostError.value = null;
+    }, 3000);
+    return;
+  }
+
+  quoteText.value = '';
+  quoteImageUrl.value = '';
+  quoteError.value = null;
+  showQuoteModal.value = true;
+}
+
+function cancelQuote() {
+  if (isQuoting.value || uploadingQuoteImage.value) return;
+  showQuoteModal.value = false;
+  quoteError.value = null;
+}
+
+function triggerQuoteFileInput() {
+  if (isQuoting.value || uploadingQuoteImage.value) return;
+  quoteFileInputRef.value?.click();
+}
+
+async function handleQuoteFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+
+  const validationError = validateImageFile(file);
+  if (validationError) {
+    quoteError.value = validationError;
+    return;
+  }
+
+  uploadingQuoteImage.value = true;
+  quoteError.value = null;
+
+  try {
+    const res = await uploadImage(file);
+    quoteImageUrl.value = res.url;
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    quoteError.value = parsed.detail || parsed.message || 'Failed to upload image.';
+  } finally {
+    uploadingQuoteImage.value = false;
+  }
+}
+
+function clearQuoteImage() {
+  quoteImageUrl.value = '';
+}
+
+async function submitQuote() {
+  if (!isQuoteValid.value || isQuoting.value || uploadingQuoteImage.value) return;
+
+  isQuoting.value = true;
+  quoteError.value = null;
+
+  try {
+    const text = quoteText.value.trim() || undefined;
+    const img = quoteImageUrl.value.trim() || undefined;
+
+    const result = await createPost({
+      text,
+      imageUrl: img,
+      quoteId: props.id,
+    });
+
+    showQuoteModal.value = false;
+    quoteText.value = '';
+    quoteImageUrl.value = '';
+    emit('quoted', result.postId);
+    router.push(`/post/${result.postId}`);
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    if (parsed.fieldErrors?.Text?.length) {
+      quoteError.value = parsed.fieldErrors.Text[0];
+    } else if (parsed.fieldErrors?.ImageUrl?.length) {
+      quoteError.value = parsed.fieldErrors.ImageUrl[0];
+    } else {
+      quoteError.value = parsed.detail || parsed.message || 'Failed to publish quote post.';
+    }
+  } finally {
+    isQuoting.value = false;
+  }
 }
 
 async function toggleBookmark() {
@@ -405,6 +519,9 @@ function handleKeydown(event: KeyboardEvent) {
     }
     if (showDeleteModal.value) {
       cancelDelete();
+    }
+    if (showQuoteModal.value) {
+      cancelQuote();
     }
   }
 }
@@ -741,6 +858,48 @@ async function handleSave() {
           <ImageLightbox :src="imageUrl" alt="Attachment" img-class="w-full h-full object-cover" />
         </div>
 
+        <!-- Embedded Quoted Post Card -->
+        <div
+          v-if="quotedPost"
+          @click.stop="router.push(`/post/${quotedPost.id}`)"
+          class="mt-2 rounded-2xl border border-neutral-800 hover:bg-neutral-900/50 transition-colors p-3 flex flex-col gap-1.5 cursor-pointer overflow-hidden"
+        >
+          <div class="flex items-center gap-1.5 text-xs flex-wrap">
+            <img
+              :src="getQuoteAuthorAvatar(quotedPost.author.id)"
+              @click.stop="goToProfile(quotedPost.author.id)"
+              class="w-5 h-5 rounded-full object-cover shrink-0 bg-neutral-800"
+              alt="Quoted Author Avatar"
+            />
+            <span
+              @click.stop="goToProfile(quotedPost.author.id)"
+              class="font-bold text-white hover:underline cursor-pointer"
+            >
+              {{ quotedPost.author.username }}
+            </span>
+            <span class="text-neutral-500">@{{ quotedPost.author.username }}</span>
+            <span class="text-neutral-600">·</span>
+            <span class="text-neutral-500">{{ formatTime(quotedPost.createdAt) }}</span>
+          </div>
+
+          <p v-if="quotedPost.text" class="text-sm text-neutral-200 leading-relaxed whitespace-pre-line">
+            {{ quotedPost.text }}
+          </p>
+
+          <div v-if="quotedPost.imageUrl" class="mt-1 rounded-xl overflow-hidden border border-neutral-800 max-h-60">
+            <img :src="quotedPost.imageUrl" alt="Quoted attachment" class="w-full h-full object-cover" />
+          </div>
+        </div>
+
+        <!-- Soft-deleted Quoted Post Placeholder -->
+        <div
+          v-else-if="quoteId"
+          @click.stop
+          class="mt-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 px-3.5 py-2.5 text-xs text-neutral-500 italic"
+        >
+          This post was deleted.
+        </div>
+
         <!-- Full timestamp row when focused (X style) -->
         <div
           v-if="isFocused && createdAt"
@@ -924,6 +1083,124 @@ async function handleSave() {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quote Post Composer Modal -->
+      <div
+        v-if="showQuoteModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs transition-opacity"
+        @click="cancelQuote"
+      >
+        <div
+          class="bg-black border border-neutral-800 rounded-2xl max-w-lg w-full p-4 flex flex-col gap-3 shadow-2xl"
+          @click.stop
+        >
+          <div class="flex items-center justify-between pb-2 border-b border-neutral-800">
+            <button
+              type="button"
+              @click="cancelQuote"
+              :disabled="isQuoting || uploadingQuoteImage"
+              class="p-1.5 rounded-full hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X class="w-5 h-5" />
+            </button>
+            <span class="text-sm font-bold text-white">Quote Post</span>
+            <div class="w-8"></div>
+          </div>
+
+          <div v-if="quoteError" class="text-xs text-red-400 bg-red-950/40 border border-red-800/80 rounded-lg p-2.5">
+            {{ quoteError }}
+          </div>
+
+          <textarea
+            v-model="quoteText"
+            rows="3"
+            placeholder="Add a comment"
+            :disabled="isQuoting"
+            class="w-full bg-transparent text-white text-base placeholder-neutral-500 resize-none focus:outline-none disabled:opacity-50"
+          ></textarea>
+
+          <input
+            ref="quoteFileInputRef"
+            type="file"
+            :accept="ALLOWED_IMAGE_ACCEPT"
+            class="hidden"
+            @change="handleQuoteFileSelect"
+          />
+
+          <div v-if="uploadingQuoteImage" class="flex items-center gap-2 text-xs text-sky-400 bg-neutral-900/80 border border-neutral-800 rounded-xl p-2.5">
+            <Loader2 class="w-4 h-4 animate-spin shrink-0" />
+            <span>Uploading image...</span>
+          </div>
+
+          <div v-if="quoteImageUrl.trim()" class="relative rounded-xl overflow-hidden border border-neutral-800 max-h-48">
+            <img :src="quoteImageUrl" alt="Quote attachment preview" class="w-full h-full object-cover" />
+            <button
+              type="button"
+              @click="clearQuoteImage"
+              title="Remove image"
+              class="absolute top-2 right-2 bg-black/75 hover:bg-black text-white p-1.5 rounded-full transition-colors cursor-pointer"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
+          <!-- Quoted Post Preview inside Modal -->
+          <div class="rounded-2xl border border-neutral-800 p-3 flex flex-col gap-1.5 bg-neutral-950/60">
+            <div class="flex items-center gap-1.5 text-xs flex-wrap">
+              <img
+                :src="avatar"
+                class="w-5 h-5 rounded-full object-cover shrink-0 bg-neutral-800"
+                alt="Quoted Author Avatar"
+              />
+              <span class="font-bold text-white">{{ author }}</span>
+              <span class="text-neutral-500">{{ handle }}</span>
+              <span class="text-neutral-600">·</span>
+              <span class="text-neutral-500">{{ timestamp }}</span>
+            </div>
+            <p v-if="content" class="text-sm text-neutral-300 leading-relaxed whitespace-pre-line line-clamp-4">
+              {{ content }}
+            </p>
+            <div v-if="imageUrl" class="mt-1 rounded-xl overflow-hidden border border-neutral-800 max-h-36">
+              <img :src="imageUrl" alt="Quoted post attachment" class="w-full h-full object-cover" />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-neutral-800">
+            <button
+              type="button"
+              @click="triggerQuoteFileInput"
+              :disabled="isQuoting || uploadingQuoteImage"
+              title="Upload Image"
+              class="p-2 hover:bg-sky-500/10 rounded-full text-sky-400 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <ImageIcon class="w-4 h-4" />
+            </button>
+
+            <div class="flex items-center gap-3">
+              <span
+                v-if="quoteText.length > 0"
+                :class="[
+                  'text-xs',
+                  remainingQuoteChars < 0 ? 'text-red-500 font-bold' : remainingQuoteChars <= 20 ? 'text-amber-400' : 'text-neutral-500'
+                ]"
+              >
+                {{ remainingQuoteChars }}
+              </span>
+
+              <button
+                type="button"
+                @click="submitQuote"
+                :disabled="!isQuoteValid || isQuoting || uploadingQuoteImage"
+                class="bg-sky-500 hover:bg-sky-400 text-white font-bold px-4 py-1.5 rounded-full text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+              >
+                <Loader2 v-if="isQuoting" class="w-3.5 h-3.5 animate-spin" />
+                <span>Post</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -204,6 +204,8 @@ onMounted(() => {
         :replies="post.replyCount"
         :reply-id="post.replyId"
         :reply-to-author="post.replyToAuthor"
+        :quote-id="post.quoteId"
+        :quoted-post="post.quotedPost"
         :can-edit="authStore.isAuthenticated && Number(authStore.currentUserId) === post.author.id"
         :is-reposted="Boolean(post.isReposted)"
         :is-bookmarked="post.isBookmarked ?? true"

@@ -322,4 +322,39 @@ public class PostTests
         Assert.False(post.IsDeleted);
         Assert.Null(post.DeletedAt);
     }
+
+    [Fact]
+    public void Create_WithQuoteId_SetsQuoteIdProperty()
+    {
+        // Act
+        var post = Post.Create(
+            userId: 42,
+            text: "quoting this!",
+            imageUrl: null,
+            replyId: null,
+            now: FixedNow,
+            quoteId: 77);
+
+        // Assert
+        Assert.Equal(42, post.UserId);
+        Assert.Equal("quoting this!", post.Text);
+        Assert.Null(post.ReplyId);
+        Assert.Equal(77, post.QuoteId);
+        Assert.Equal(FixedNow, post.CreatedAt);
+    }
+
+    [Fact]
+    public void Create_WithoutQuoteId_DefaultsQuoteIdToNull()
+    {
+        // Act
+        var post = Post.Create(
+            userId: 42,
+            text: "regular post",
+            imageUrl: null,
+            replyId: null,
+            now: FixedNow);
+
+        // Assert
+        Assert.Null(post.QuoteId);
+    }
 }

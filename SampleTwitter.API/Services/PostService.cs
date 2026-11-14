@@ -22,7 +22,7 @@ public class PostService : IPostService
 
     public async Task<CreatePostResult> Create(CreatePostRequest request, long userId, CancellationToken ct = default)
     {
-        var post = Post.Create(userId, request.Text, request.ImageUrl, request.ReplyId);
+        var post = Post.Create(userId, request.Text, request.ImageUrl, request.ReplyId, quoteId: request.QuoteId);
 
         if (post.ReplyId is not null)
         {
@@ -33,6 +33,18 @@ public class PostService : IPostService
             {
                 _logger.LogWarning("Reply target post {ReplyId} not found", post.ReplyId);
                 throw new PostNotFoundException($"Post with id {post.ReplyId} was not found.");
+            }
+        }
+
+        if (post.QuoteId is not null)
+        {
+            var quotedExists = await _applicationContext.Posts
+                .AnyAsync(p => p.Id == post.QuoteId, ct);
+
+            if (!quotedExists)
+            {
+                _logger.LogWarning("Quoted target post {QuoteId} not found", post.QuoteId);
+                throw new PostNotFoundException($"Post with id {post.QuoteId} was not found.");
             }
         }
 
@@ -47,7 +59,8 @@ public class PostService : IPostService
             post.ImageUrl,
             post.ReplyId,
             post.UserId,
-            post.CreatedAt);
+            post.CreatedAt,
+            post.QuoteId);
     }
 
     public async Task<EditPostResult> Edit(long postId, EditPostRequest request, long userId, CancellationToken ct = default)
@@ -99,7 +112,17 @@ public class PostService : IPostService
                     p.Reposts.Count,
                     p.Replies.Count,
                     viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
-                    viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
+                    viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value),
+                    p.QuoteId,
+                    p.Quote == null
+                        ? null
+                        : new QuotedPostResult(
+                            p.Quote.Id,
+                            p.Quote.Text,
+                            p.Quote.ImageUrl,
+                            p.Quote.CreatedAt,
+                            p.Quote.UpdatedAt,
+                            new PostAuthorResult(p.Quote.UserId, p.Quote.User.Username))))
             .ToListAsync(ct);
 
         return new ProfilePostFeedResult(posts, new PostAuthorResult(user.Id, user.Username));
@@ -215,7 +238,17 @@ public class PostService : IPostService
                 viewerUserId.HasValue && r.Post.Reposts.Any(rep => rep.UserId == viewerUserId.Value),
                 r.Post.Reply == null
                     ? null
-                    : new PostAuthorResult(r.Post.Reply.UserId, r.Post.Reply.User.Username)))
+                    : new PostAuthorResult(r.Post.Reply.UserId, r.Post.Reply.User.Username),
+                r.Post.QuoteId,
+                r.Post.Quote == null
+                    ? null
+                    : new QuotedPostResult(
+                        r.Post.Quote.Id,
+                        r.Post.Quote.Text,
+                        r.Post.Quote.ImageUrl,
+                        r.Post.Quote.CreatedAt,
+                        r.Post.Quote.UpdatedAt,
+                        new PostAuthorResult(r.Post.Quote.UserId, r.Post.Quote.User.Username))))
             .ToListAsync(ct);
     }
 
@@ -237,7 +270,17 @@ public class PostService : IPostService
                 viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value),
                 p.Reply == null
                     ? null
-                    : new PostAuthorResult(p.Reply.UserId, p.Reply.User.Username)))
+                    : new PostAuthorResult(p.Reply.UserId, p.Reply.User.Username),
+                p.QuoteId,
+                p.Quote == null
+                    ? null
+                    : new QuotedPostResult(
+                        p.Quote.Id,
+                        p.Quote.Text,
+                        p.Quote.ImageUrl,
+                        p.Quote.CreatedAt,
+                        p.Quote.UpdatedAt,
+                        new PostAuthorResult(p.Quote.UserId, p.Quote.User.Username))))
             .SingleOrDefaultAsync(ct);
 
         if (post is null)
@@ -287,11 +330,31 @@ public class PostService : IPostService
                         viewerUserId.HasValue && p.Reply.Reposts.Any(r => r.UserId == viewerUserId.Value),
                         p.Reply.Reply == null
                             ? null
-                            : new PostAuthorResult(p.Reply.Reply.UserId, p.Reply.Reply.User.Username)),
+                            : new PostAuthorResult(p.Reply.Reply.UserId, p.Reply.Reply.User.Username),
+                        p.Reply.QuoteId,
+                        p.Reply.Quote == null
+                            ? null
+                            : new QuotedPostResult(
+                                p.Reply.Quote.Id,
+                                p.Reply.Quote.Text,
+                                p.Reply.Quote.ImageUrl,
+                                p.Reply.Quote.CreatedAt,
+                                p.Reply.Quote.UpdatedAt,
+                                new PostAuthorResult(p.Reply.Quote.UserId, p.Reply.Quote.User.Username))),
                 p.Reposts.Count,
                 p.Replies.Count,
                 viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
-                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
+                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value),
+                p.QuoteId,
+                p.Quote == null
+                    ? null
+                    : new QuotedPostResult(
+                        p.Quote.Id,
+                        p.Quote.Text,
+                        p.Quote.ImageUrl,
+                        p.Quote.CreatedAt,
+                        p.Quote.UpdatedAt,
+                        new PostAuthorResult(p.Quote.UserId, p.Quote.User.Username))))
             .ToListAsync(ct);
 
         return new ProfileReplyFeedResult(repliesFeed, new PostAuthorResult(user.Id, user.Username));
@@ -321,7 +384,17 @@ public class PostService : IPostService
                 p.Reposts.Count,
                 p.Replies.Count,
                 viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
-                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
+                viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value),
+                p.QuoteId,
+                p.Quote == null
+                    ? null
+                    : new QuotedPostResult(
+                        p.Quote.Id,
+                        p.Quote.Text,
+                        p.Quote.ImageUrl,
+                        p.Quote.CreatedAt,
+                        p.Quote.UpdatedAt,
+                        new PostAuthorResult(p.Quote.UserId, p.Quote.User.Username))))
             .ToListAsync(ct);
     }
 
@@ -416,7 +489,17 @@ public class PostService : IPostService
                 b.Post.Reposts.Any(r => r.UserId == userId),
                 b.Post.Reply == null
                     ? null
-                    : new PostAuthorResult(b.Post.Reply.UserId, b.Post.Reply.User.Username)))
+                    : new PostAuthorResult(b.Post.Reply.UserId, b.Post.Reply.User.Username),
+                b.Post.QuoteId,
+                b.Post.Quote == null
+                    ? null
+                    : new QuotedPostResult(
+                        b.Post.Quote.Id,
+                        b.Post.Quote.Text,
+                        b.Post.Quote.ImageUrl,
+                        b.Post.Quote.CreatedAt,
+                        b.Post.Quote.UpdatedAt,
+                        new PostAuthorResult(b.Post.Quote.UserId, b.Post.Quote.User.Username))))
             .ToListAsync(ct);
     }
 

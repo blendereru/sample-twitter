@@ -12,6 +12,8 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// <param name="ReplyCount">The total number of direct replies this post has received.</param>
 /// <param name="IsBookmarked">Whether the current authenticated user has bookmarked this post.</param>
 /// <param name="IsReposted">Whether the current authenticated user has reposted this post.</param>
+/// <param name="QuoteId">The ID of the quoted post, if this post quotes another post.</param>
+/// <param name="QuotedPost">The embedded quoted post details, or null if not a quote or if the quoted post was deleted.</param>
 public record PostFeedItemDto(
     long Id,
     string? Text,
@@ -21,5 +23,6 @@ public record PostFeedItemDto(
     int RepostCount,
     int ReplyCount,
     bool IsBookmarked = false,
-    bool IsReposted = false
-);
+    bool IsReposted = false,
+    long? QuoteId = null,
+    QuotedPostDto? QuotedPost = null);

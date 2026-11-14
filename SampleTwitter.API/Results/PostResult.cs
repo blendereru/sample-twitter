@@ -12,4 +12,6 @@ public record PostResult(
     int ReplyCount,
     bool IsBookmarked = false,
     bool IsReposted = false,
-    PostAuthorResult? ReplyToAuthor = null);
+    PostAuthorResult? ReplyToAuthor = null,
+    long? QuoteId = null,
+    QuotedPostResult? QuotedPost = null);

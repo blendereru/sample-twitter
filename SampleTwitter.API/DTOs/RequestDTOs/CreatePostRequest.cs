@@ -18,4 +18,9 @@ public class CreatePostRequest
     /// ID of the post being replied to. Omit for original top-level posts.
     /// </summary>
     public long? ReplyId { get; set; }
+
+    /// <summary>
+    /// ID of the quoting post. Omit if not quoting any post.
+    /// </summary>
+    public long? QuoteId { get; set; }
 }

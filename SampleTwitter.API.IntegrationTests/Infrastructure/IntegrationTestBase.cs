@@ -89,12 +89,13 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         long? replyId = null,
         DateTimeOffset? createdAt = null,
         DateTimeOffset? updatedAt = null,
-        bool isDeleted = false)
+        bool isDeleted = false,
+        long? quoteId = null)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-        var post = Post.Create(userId, text, imageUrl, replyId, createdAt);
+        var post = Post.Create(userId, text, imageUrl, replyId, createdAt, quoteId);
         if (updatedAt is not null)
         {
             post.Edit(userId, text, imageUrl, updatedAt);

@@ -9,4 +9,6 @@ public record PostFeedItemResult(
     int RepostCount,
     int ReplyCount,
     bool IsBookmarked = false,
-    bool IsReposted = false);
+    bool IsReposted = false,
+    long? QuoteId = null,
+    QuotedPostResult? QuotedPost = null);

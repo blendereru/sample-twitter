@@ -11,4 +11,6 @@ public record BookmarkFeedResult(
     int RepostCount,
     int ReplyCount,
     bool IsReposted = false,
-    PostAuthorResult? ReplyToAuthor = null);
+    PostAuthorResult? ReplyToAuthor = null,
+    long? QuoteId = null,
+    QuotedPostResult? QuotedPost = null);

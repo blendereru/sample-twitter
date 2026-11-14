@@ -188,4 +188,64 @@ public class GetByIdTests : IntegrationTestBase
         Assert.NotNull(body);
         Assert.Equal(post.Id, body.Id);
     }
+
+    [Fact]
+    public async Task QuotePost_ReturnsQuoteIdAndQuotedPostDetails()
+    {
+        // Arrange
+        var originalAuthor = await SeedUser("original@example.com", "Sup3rSecret1!", username: "original_author");
+        var quoter = await SeedUser("quoter@example.com", "Sup3rSecret1!", username: "quoter_user");
+        var quoted = await SeedPost(
+            userId: originalAuthor.Id,
+            text: "quoted content",
+            imageUrl: "https://example.com/quoted.png");
+        var quotePost = await SeedPost(
+            userId: quoter.Id,
+            text: "check this out",
+            quoteId: quoted.Id);
+
+        // Act
+        var response = await Client.GetAsync($"/api/posts/{quotePost.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(quoted.Id, body.QuoteId);
+        Assert.NotNull(body.QuotedPost);
+        Assert.Equal(quoted.Id, body.QuotedPost.Id);
+        Assert.Equal("quoted content", body.QuotedPost.Text);
+        Assert.Equal("https://example.com/quoted.png", body.QuotedPost.ImageUrl);
+        Assert.Equal(originalAuthor.Id, body.QuotedPost.Author.Id);
+        Assert.Equal("original_author", body.QuotedPost.Author.Username);
+    }
+
+    [Fact]
+    public async Task QuotePost_WhenQuotedPostIsSoftDeleted_ReturnsQuoteIdWithNullQuotedPost()
+    {
+        // Arrange
+        var (originalAuthor, originalCookie) = await SeedAndSignIn("original@example.com", "Sup3rSecret1!", username: "original_author");
+        var quoter = await SeedUser("quoter@example.com", "Sup3rSecret1!", username: "quoter_user");
+        var quoted = await SeedPost(userId: originalAuthor.Id, text: "will be deleted");
+        var quotePost = await SeedPost(userId: quoter.Id, text: "quoting before deletion", quoteId: quoted.Id);
+
+        var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"/api/posts/{quoted.Id}")
+        {
+            Headers = { { "Cookie", originalCookie } }
+        };
+        var deleteResponse = await Client.SendAsync(deleteRequest);
+        deleteResponse.EnsureSuccessStatusCode();
+
+        // Act
+        var response = await Client.GetAsync($"/api/posts/{quotePost.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(body);
+        Assert.Equal(quoted.Id, body.QuoteId);
+        Assert.Null(body.QuotedPost);
+    }
 }

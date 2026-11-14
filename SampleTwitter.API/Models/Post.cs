@@ -9,12 +9,15 @@ public class Post
     private readonly List<Repost> _reposts = new();
     private readonly List<Post> _replies = new();
     private readonly List<Bookmark> _bookmarks = new();
+    private readonly List<Post> _quotes = new();
 
     public long Id { get; private set; }
     public string? Text { get; private set; }
     public string? ImageUrl { get; private set; }
     public long? ReplyId { get; private set; }
     public Post? Reply { get; private set; }
+    public long? QuoteId { get; private set; }
+    public Post? Quote { get; private set; }
     public long UserId { get; private set; }
     public User User { get; private set; } = null!;
     public DateTimeOffset CreatedAt { get; private set; }
@@ -24,6 +27,7 @@ public class Post
     public IReadOnlyCollection<Repost> Reposts => _reposts;
     public IReadOnlyCollection<Post> Replies => _replies;
     public IReadOnlyCollection<Bookmark> Bookmarks => _bookmarks;
+    public IReadOnlyCollection<Post> Quotes => _quotes;
 
     /// <summary>
     /// Used by EF Core for materialization. Application code must use <see cref="Create"/>.
@@ -37,7 +41,8 @@ public class Post
         string? text,
         string? imageUrl,
         long? replyId,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        long? quoteId = null)
     {
         var (normalizedText, normalizedImageUrl) = NormalizeContent(
             text,
@@ -50,6 +55,7 @@ public class Post
             Text = normalizedText,
             ImageUrl = normalizedImageUrl,
             ReplyId = replyId,
+            QuoteId = quoteId,
             CreatedAt = now ?? DateTimeOffset.UtcNow
         };
     }

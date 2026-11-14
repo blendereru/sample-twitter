@@ -106,6 +106,7 @@ export interface CreatePostRequest {
   text?: string;
   imageUrl?: string;
   replyId?: number;
+  quoteId?: number;
 }
 
 export interface CreatePostResponse {
@@ -142,6 +143,15 @@ export interface PostAuthorDto {
   username: string;
 }
 
+export interface QuotedPostDto {
+  id: number;
+  text?: string;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt?: string;
+  author: PostAuthorDto;
+}
+
 export interface PostFeedItemDto {
   id: number;
   text?: string;
@@ -152,6 +162,8 @@ export interface PostFeedItemDto {
   replyCount: number;
   isBookmarked?: boolean;
   isReposted?: boolean;
+  quoteId?: number | null;
+  quotedPost?: QuotedPostDto | null;
 }
 
 export interface PostFeedResponse {
@@ -172,6 +184,8 @@ export interface PostResponse {
   isBookmarked?: boolean;
   isReposted?: boolean;
   replyToAuthor?: PostAuthorDto | null;
+  quoteId?: number | null;
+  quotedPost?: QuotedPostDto | null;
 }
 
 export interface ReplyFeedItemDto {
@@ -185,6 +199,8 @@ export interface ReplyFeedItemDto {
   replyCount: number;
   isBookmarked?: boolean;
   isReposted?: boolean;
+  quoteId?: number | null;
+  quotedPost?: QuotedPostDto | null;
 }
 
 export interface ReplyFeedResponse {

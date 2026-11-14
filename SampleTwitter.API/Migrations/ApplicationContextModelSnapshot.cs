@@ -148,6 +148,9 @@ namespace SampleTwitter.API.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<long?>("QuoteId")
+                        .HasColumnType("bigint");
+
                     b.Property<long?>("ReplyId")
                         .HasColumnType("bigint");
 
@@ -162,6 +165,8 @@ namespace SampleTwitter.API.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("QuoteId");
 
                     b.HasIndex("ReplyId");
 
@@ -299,6 +304,11 @@ namespace SampleTwitter.API.Migrations
 
             modelBuilder.Entity("SampleTwitter.API.Models.Post", b =>
                 {
+                    b.HasOne("SampleTwitter.API.Models.Post", "Quote")
+                        .WithMany("Quotes")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SampleTwitter.API.Models.Post", "Reply")
                         .WithMany("Replies")
                         .HasForeignKey("ReplyId")
@@ -309,6 +319,8 @@ namespace SampleTwitter.API.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Quote");
 
                     b.Navigation("Reply");
 
@@ -337,6 +349,8 @@ namespace SampleTwitter.API.Migrations
             modelBuilder.Entity("SampleTwitter.API.Models.Post", b =>
                 {
                     b.Navigation("Bookmarks");
+
+                    b.Navigation("Quotes");
 
                     b.Navigation("Replies");
 

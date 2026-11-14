@@ -247,7 +247,17 @@ public class PostController : ControllerBase
             result.IsReposted,
             result.ReplyToAuthor is null
                 ? null
-                : new PostAuthorDto(result.ReplyToAuthor.Id, result.ReplyToAuthor.Username));
+                : new PostAuthorDto(result.ReplyToAuthor.Id, result.ReplyToAuthor.Username),
+            result.QuoteId,
+            result.QuotedPost is null
+                ? null
+                : new QuotedPostDto(
+                    result.QuotedPost.Id,
+                    result.QuotedPost.Text,
+                    result.QuotedPost.ImageUrl,
+                    result.QuotedPost.CreatedAt,
+                    result.QuotedPost.UpdatedAt,
+                    new PostAuthorDto(result.QuotedPost.Author.Id, result.QuotedPost.Author.Username)));
 
         return Ok(response);
     }
@@ -280,7 +290,18 @@ public class PostController : ControllerBase
             r.RepostCount,
             r.ReplyCount,
             r.IsBookmarked,
-            r.IsReposted)).ToList();
+            r.IsReposted,
+            ReplyToAuthor: null,
+            r.QuoteId,
+            r.QuotedPost is null
+                ? null
+                : new QuotedPostDto(
+                    r.QuotedPost.Id,
+                    r.QuotedPost.Text,
+                    r.QuotedPost.ImageUrl,
+                    r.QuotedPost.CreatedAt,
+                    r.QuotedPost.UpdatedAt,
+                    new PostAuthorDto(r.QuotedPost.Author.Id, r.QuotedPost.Author.Username)))).ToList();
 
         return Ok(response);
     }
