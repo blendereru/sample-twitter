@@ -248,7 +248,7 @@ public class GetProfilePostsTests : IntegrationTestBase
     public async Task MapsAllFieldsCorrectly()
     {
         // Arrange
-        var user = await SeedUser("alice@example.com", "Sup3rSecret1!");
+        var user = await SeedUser("alice@example.com", "Sup3rSecret1!", username: "alice");
         var now = DateTimeOffset.UtcNow;
         var post = await SeedPost(
             userId: user.Id,
@@ -267,7 +267,7 @@ public class GetProfilePostsTests : IntegrationTestBase
         Assert.NotNull(body);
 
         Assert.Equal(user.Id, body.Author.Id);
-        Assert.Equal("alice@example.com", body.Author.Email);
+        Assert.Equal(user.Username, body.Author.Username);
 
         var item = Assert.Single(body.Items);
         Assert.Equal(post.Id, item.Id);
@@ -469,7 +469,7 @@ public class GetProfilePostsTests : IntegrationTestBase
     public async Task UserExistsWithNoPosts_ReturnsAuthorDetailsWithEmptyItems()
     {
         // Arrange
-        var user = await SeedUser("emptyuser_details@example.com", "Sup3rSecret1!");
+        var user = await SeedUser("emptyuser_details@example.com", "Sup3rSecret1!", username: "emptyuser_details");
 
         // Act
         var response = await Client.GetAsync($"/api/users/{user.Id}/posts");
@@ -479,7 +479,7 @@ public class GetProfilePostsTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<PostFeedResponse>();
         Assert.NotNull(body);
         Assert.Equal(user.Id, body.Author.Id);
-        Assert.Equal("emptyuser_details@example.com", body.Author.Email);
+        Assert.Equal(user.Username, body.Author.Username);
         Assert.Empty(body.Items);
     }
 

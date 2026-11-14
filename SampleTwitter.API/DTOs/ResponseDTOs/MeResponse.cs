@@ -7,6 +7,6 @@ public record MeResponse(
     long Id,
     string Email,
     DateTimeOffset RegisteredAt,
-    string? Username = null,
+    string Username,
     string? ImageUrl = null,
     DateTimeOffset? UpdatedAt = null);

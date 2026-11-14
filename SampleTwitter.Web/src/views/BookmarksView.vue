@@ -28,7 +28,7 @@ function getDisplayName(post: PostResponse): string {
   if (authStore.currentUserId && Number(authStore.currentUserId) === post.author.id && authStore.currentUsername) {
     return authStore.currentUsername;
   }
-  return post.author.email.split('@')[0];
+  return post.author.username;
 }
 
 function formatDate(dateStr: string): string {
@@ -194,7 +194,7 @@ onMounted(() => {
         :id="post.id"
         :user-id="post.author.id"
         :author="getDisplayName(post)"
-        :handle="'@' + post.author.email"
+        :handle="'@' + post.author.username"
         :avatar="getAvatar(post.author.id)"
         :content="post.text || ''"
         :image-url="post.imageUrl"

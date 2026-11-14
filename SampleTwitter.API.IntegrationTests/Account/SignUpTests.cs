@@ -17,12 +17,16 @@ public class SignUpTests : IntegrationTestBase
 
     public static TheoryData<object, string> InvalidRequestCases => new()
     {
-        { new { Password = "Sup3rSecret1!" },                                      "Email"    },
-        { new { Email    = "user@example.com" },                                   "Password" },
-        { new SignUpRequest { Email = "new@example.com", Password = "short" },     "Password" },
-        { new { Email = "not-an-email", Password = "Sup3rSecret1!" },              "Email"    },
-        { new { Email = "", Password = "Sup3rSecret1!" },                          "Email"    },
-        { new { Email = "user@example.com", Password = "" },                       "Password" }
+        { new { Password = "Sup3rSecret1!" },                                                       "Email"    },
+        { new { Email    = "user@example.com" },                                                    "Password" },
+        { new SignUpRequest { Email = "new@example.com", Password = "short" },                      "Password" },
+        { new { Email = "not-an-email", Password = "Sup3rSecret1!" },                               "Email"    },
+        { new { Email = "", Password = "Sup3rSecret1!" },                                           "Email"    },
+        { new { Email = "user@example.com", Password = "" },                                        "Password" },
+        { new SignUpRequest { Email = "user@example.com", Password = "Sup3rSecret1!", Username = "ab" },           "Username" },
+        { new SignUpRequest { Email = "user@example.com", Password = "Sup3rSecret1!", Username = new string('u', 31) }, "Username" },
+        { new SignUpRequest { Email = "user@example.com", Password = "Sup3rSecret1!", Username = "invalid-char" }, "Username" },
+        { new SignUpRequest { Email = "user@example.com", Password = "Sup3rSecret1!", Username = "admin" },        "Username" }
     };
 
     [Theory]
@@ -116,11 +120,57 @@ public class SignUpTests : IntegrationTestBase
         var sentEmail = Assert.Single(Factory.FakeEmailSender.SentEmails);
         Assert.Equal("new@example.com", sentEmail.ToEmail);
 
-        // Assert — DB: user persisted, not yet confirmed, password hashed
+        // Assert — DB: user persisted, not yet confirmed, password hashed, random username assigned
         var user = await QueryUserAsync("new@example.com");
         Assert.NotNull(user);
         Assert.False(user.EmailConfirmed);
         Assert.NotEqual("Sup3rSecret1!", user.PasswordHash);
+        Assert.Matches("^user_[a-z0-9]{8}$", user.Username);
+        Assert.Equal(user.Username, user.NormalizedUsername);
+    }
+
+    [Fact]
+    public async Task NewEmail_WithCustomUsername_PersistsTrimmedUsernameAndNormalizedUsername()
+    {
+        // Arrange
+        var request = new SignUpRequest
+        {
+            Email = "custom@example.com",
+            Password = "Sup3rSecret1!",
+            Username = "  Custom_Handle_99  "
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var user = await QueryUserAsync("custom@example.com");
+        Assert.NotNull(user);
+        Assert.Equal("Custom_Handle_99", user.Username);
+        Assert.Equal("custom_handle_99", user.NormalizedUsername);
+    }
+
+    [Fact]
+    public async Task NewEmail_WithTakenUsername_Returns409ConflictWithProblemDetails()
+    {
+        // Arrange
+        await SeedUser("existing@example.com", "Sup3rSecret1!", username: "TakenHandle");
+
+        var request = new SignUpRequest
+        {
+            Email = "new@example.com",
+            Password = "Sup3rSecret1!",
+            Username = "takenhandle"
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync("/api/auth/signup", request);
+
+        // Assert
+        await response.AssertProblemDetails(HttpStatusCode.Conflict);
+        Assert.Null(await QueryUserAsync("new@example.com"));
     }
 
     [Fact]
@@ -220,7 +270,8 @@ public class SignUpTests : IntegrationTestBase
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        var user = User.Register(email, passwordHash, DateTimeOffset.UtcNow.AddDays(-5));
+        var usernameGenerator = scope.ServiceProvider.GetRequiredService<SampleTwitter.API.Abstractions.IUsernameGenerator>();
+        var user = User.Register(email, passwordHash, usernameGenerator.Generate(), DateTimeOffset.UtcNow.AddDays(-5));
         user.ConfirmEmail();
         db.Users.Add(user);
         await db.SaveChangesAsync();
@@ -230,7 +281,8 @@ public class SignUpTests : IntegrationTestBase
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        db.Users.Add(User.Register(email, passwordHash, DateTimeOffset.UtcNow.AddDays(-1)));
+        var usernameGenerator = scope.ServiceProvider.GetRequiredService<SampleTwitter.API.Abstractions.IUsernameGenerator>();
+        db.Users.Add(User.Register(email, passwordHash, usernameGenerator.Generate(), DateTimeOffset.UtcNow.AddDays(-1)));
         await db.SaveChangesAsync();
     }
 

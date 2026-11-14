@@ -100,7 +100,7 @@ public class GetBookmarksTests : IntegrationTestBase
         Assert.Equal("Post 2", body[0].Text);
         Assert.Equal("https://example.com/img.png", body[0].ImageUrl);
         Assert.Equal(author2.Id, body[0].Author.Id);
-        Assert.Equal(author2.Email, body[0].Author.Email);
+        Assert.Equal(author2.Username, body[0].Author.Username);
         Assert.Equal(1, body[0].RepostCount);
         Assert.Equal(1, body[0].ReplyCount);
         Assert.True(body[0].IsBookmarked);
@@ -164,7 +164,7 @@ public class GetBookmarksTests : IntegrationTestBase
         Assert.Equal(parent.Id, item.ReplyId);
         Assert.NotNull(item.ReplyToAuthor);
         Assert.Equal(parentAuthor.Id, item.ReplyToAuthor.Id);
-        Assert.Equal(parentAuthor.Email, item.ReplyToAuthor.Email);
+        Assert.Equal(parentAuthor.Username, item.ReplyToAuthor.Username);
     }
 
     [Fact]

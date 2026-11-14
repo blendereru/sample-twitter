@@ -1,6 +1,8 @@
 export interface SignUpRequest {
   email: string;
   password: string;
+  /** Optional; a random username is assigned when omitted. */
+  username?: string | null;
 }
 
 export interface SignUpResponse {
@@ -27,7 +29,7 @@ export interface MeResponse {
   id: number;
   email: string;
   registeredAt: string;
-  username?: string | null;
+  username: string;
   imageUrl?: string | null;
   updatedAt?: string | null;
 }
@@ -36,7 +38,7 @@ export interface UserResponse {
   id: number;
   email: string;
   registeredAt: string;
-  username?: string | null;
+  username: string;
   imageUrl?: string | null;
   updatedAt?: string | null;
   followersCount?: number;
@@ -51,13 +53,13 @@ export interface FollowResponse {
 }
 
 export interface EditProfileRequest {
-  username?: string | null;
+  username: string;
   imageUrl?: string | null;
 }
 
 export interface EditProfileResponse {
   id: number;
-  username?: string | null;
+  username: string;
   imageUrl?: string | null;
   updatedAt?: string | null;
 }
@@ -137,7 +139,7 @@ export interface BookmarkResponse {
 
 export interface PostAuthorDto {
   id: number;
-  email: string;
+  username: string;
 }
 
 export interface PostFeedItemDto {

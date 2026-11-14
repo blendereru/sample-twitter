@@ -722,7 +722,7 @@ async function handleSave() {
             @click.stop="goToProfile(replyToAuthor.id)"
             class="text-sky-500 font-medium hover:underline cursor-pointer"
           >
-            @{{ replyToAuthor.email.split('@')[0] }}
+            @{{ replyToAuthor.username }}
           </span>
           <span v-else class="text-neutral-500 italic">
             a deleted post

@@ -13,7 +13,7 @@ public class GetByIdTests : IntegrationTestBase
     public async Task ValidPost_Returns200WithAllFieldsMapped()
     {
         // Arrange
-        var user = await SeedUser("alice@example.com", "Sup3rSecret1!");
+        var user = await SeedUser("alice@example.com", "Sup3rSecret1!", username: "alice");
         var now = DateTimeOffset.UtcNow;
         var post = await SeedPost(
             userId: user.Id,
@@ -37,7 +37,7 @@ public class GetByIdTests : IntegrationTestBase
         Assert.NotNull(body.UpdatedAt);
         Assert.Equal(post.UpdatedAt!.Value.ToUnixTimeMilliseconds(), body.UpdatedAt.Value.ToUnixTimeMilliseconds());
         Assert.Equal(user.Id, body.Author.Id);
-        Assert.Equal("alice@example.com", body.Author.Email);
+        Assert.Equal("alice", body.Author.Username);
         Assert.Null(body.ReplyId);
         Assert.Equal(0, body.RepostCount);
         Assert.Equal(0, body.ReplyCount);
@@ -150,7 +150,7 @@ public class GetByIdTests : IntegrationTestBase
         Assert.Equal(parent.Id, body.ReplyId);
         Assert.NotNull(body.ReplyToAuthor);
         Assert.Equal(user.Id, body.ReplyToAuthor.Id);
-        Assert.Equal(user.Email, body.ReplyToAuthor.Email);
+        Assert.Equal(user.Username, body.ReplyToAuthor.Username);
     }
 
     [Fact]

@@ -14,7 +14,7 @@ namespace SampleTwitter.API.IntegrationTests.Account;
 public class ConfirmEmailTests : IntegrationTestBase
 {
     public ConfirmEmailTests(ApiWebApplicationFactory factory) : base(factory) { }
-    
+
     [Fact]
     public async Task ValidToken_Returns200AndSignsInAndMarksTokenUsed()
     {
@@ -47,7 +47,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         Assert.NotNull(token);
         Assert.NotNull(token.UsedAt);
     }
-    
+
     [Fact]
     public async Task TokenNotFound_WrongTokenString_Returns400WithProblemDetails()
     {
@@ -62,7 +62,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.BadRequest);
     }
-    
+
     [Fact]
     public async Task TokenNotFound_WrongUserId_Returns400WithProblemDetails()
     {
@@ -77,7 +77,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.BadRequest);
     }
-    
+
     [Fact]
     public async Task AlreadyUsedToken_Returns400WithProblemDetails()
     {
@@ -92,7 +92,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.BadRequest);
     }
-    
+
     [Fact]
     public async Task ExpiredToken_Returns400WithProblemDetails()
     {
@@ -107,7 +107,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         // Assert
         await response.AssertProblemDetails(HttpStatusCode.BadRequest);
     }
-    
+
     [Fact]
     public async Task ValidToken_UsedTwice_SecondCallReturns400()
     {
@@ -260,7 +260,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         Assert.NotNull(user);
         Assert.True(user.EmailConfirmed);
     }
-    
+
     private async Task<(long UserId, string RawToken)> SeedUserWithValidToken(
         string email,
         string? rawToken = null)
@@ -269,8 +269,9 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var usernameGenerator = scope.ServiceProvider.GetRequiredService<IUsernameGenerator>();
 
-        var user = User.Register(email, "some-hash");
+        var user = User.Register(email, "some-hash", usernameGenerator.Generate());
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
@@ -281,15 +282,16 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         return (user.Id, rawToken);
     }
-    
+
     private async Task<(long UserId, string RawToken)> SeedUserWithUsedToken(string email)
     {
         const string rawToken = "integration-test-used-token";
 
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var usernameGenerator = scope.ServiceProvider.GetRequiredService<SampleTwitter.API.Abstractions.IUsernameGenerator>();
 
-        var user = User.Register(email, "some-hash");
+        var user = User.Register(email, "some-hash", usernameGenerator.Generate());
         user.ConfirmEmail();
         db.Users.Add(user);
         await db.SaveChangesAsync();
@@ -302,15 +304,16 @@ public class ConfirmEmailTests : IntegrationTestBase
 
         return (user.Id, rawToken);
     }
-    
+
     private async Task<(long UserId, string RawToken)> SeedUserWithExpiredToken(string email)
     {
         const string rawToken = "integration-test-expired-token";
 
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        var usernameGenerator = scope.ServiceProvider.GetRequiredService<SampleTwitter.API.Abstractions.IUsernameGenerator>();
 
-        var user = User.Register(email, "some-hash");
+        var user = User.Register(email, "some-hash", usernameGenerator.Generate());
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
@@ -337,7 +340,7 @@ public class ConfirmEmailTests : IntegrationTestBase
         return await db.EmailConfirmationTokens.AsNoTracking()
             .SingleOrDefaultAsync(t => t.UserId == userId);
     }
-    
+
     private string ComputeTokenHash(string rawToken)
     {
         using var scope = Factory.Services.CreateScope();

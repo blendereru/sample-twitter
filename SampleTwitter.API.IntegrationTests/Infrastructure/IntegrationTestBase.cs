@@ -37,13 +37,22 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    protected async Task<User> SeedUser(string email, string password, bool emailConfirmed = true)
+    /// <summary>
+    /// Seeds a user directly in the database. When <paramref name="username"/> is omitted,
+    /// a random one is assigned via <see cref="IUsernameGenerator"/>, mirroring sign up without a username.
+    /// </summary>
+    protected async Task<User> SeedUser(
+        string email,
+        string password,
+        bool emailConfirmed = true,
+        string? username = null)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var usernameGenerator = scope.ServiceProvider.GetRequiredService<IUsernameGenerator>();
 
-        var user = User.Register(email, hasher.Hash(password));
+        var user = User.Register(email, hasher.Hash(password), username ?? usernameGenerator.Generate());
         if (emailConfirmed)
         {
             user.ConfirmEmail();
@@ -54,9 +63,12 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return user;
     }
 
-    protected async Task<(User User, string Cookie)> SeedAndSignIn(string email, string password)
+    protected async Task<(User User, string Cookie)> SeedAndSignIn(
+        string email,
+        string password,
+        string? username = null)
     {
-        var user = await SeedUser(email, password);
+        var user = await SeedUser(email, password, username: username);
 
         var loginResponse = await Client.PostAsJsonAsync("/api/auth/signin",
             new LoginRequest { Email = email, Password = password });

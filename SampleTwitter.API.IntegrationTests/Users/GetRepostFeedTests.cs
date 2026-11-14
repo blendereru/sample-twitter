@@ -54,7 +54,7 @@ public class GetRepostFeedTests : IntegrationTestBase
         Assert.Equal(post.Id, item.Id);
         Assert.Equal("Public post", item.Text);
         Assert.Equal(author.Id, item.Author.Id);
-        Assert.Equal(author.Email, item.Author.Email);
+        Assert.Equal(author.Username, item.Author.Username);
         Assert.Equal(1, item.RepostCount);
         Assert.False(item.IsBookmarked);
         Assert.False(item.IsReposted);
@@ -219,7 +219,7 @@ public class GetRepostFeedTests : IntegrationTestBase
         Assert.Equal("https://example.com/img.png", body[0].ImageUrl);
         Assert.NotNull(body[0].UpdatedAt);
         Assert.Equal(author2.Id, body[0].Author.Id);
-        Assert.Equal(author2.Email, body[0].Author.Email);
+        Assert.Equal(author2.Username, body[0].Author.Username);
         Assert.Equal(1, body[0].RepostCount);
         Assert.Equal(1, body[0].ReplyCount);
 
@@ -303,7 +303,7 @@ public class GetRepostFeedTests : IntegrationTestBase
         Assert.Equal(parent.Id, item.ReplyId);
         Assert.NotNull(item.ReplyToAuthor);
         Assert.Equal(parentAuthor.Id, item.ReplyToAuthor.Id);
-        Assert.Equal(parentAuthor.Email, item.ReplyToAuthor.Email);
+        Assert.Equal(parentAuthor.Username, item.ReplyToAuthor.Username);
     }
 
     [Fact]

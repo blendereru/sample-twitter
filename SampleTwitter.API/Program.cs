@@ -45,6 +45,7 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IImageStorage, LocalFileImageStorage>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
+builder.Services.AddSingleton<IUsernameGenerator, UsernameGenerator>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("AppSettings"));
 builder.Services.AddExceptionHandler<AppExceptionHandler>();

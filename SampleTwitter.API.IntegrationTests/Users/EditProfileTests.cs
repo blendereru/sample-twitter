@@ -118,8 +118,8 @@ public class EditProfileTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
         var user2Db = db.Users.Single(u => u.Id == user2.Id);
-        Assert.Null(user2Db.Username);
-        Assert.Null(user2Db.NormalizedUsername);
+        Assert.Equal(user2.Username, user2Db.Username);
+        Assert.Equal(user2.NormalizedUsername, user2Db.NormalizedUsername);
     }
 
     [Fact]
@@ -164,22 +164,22 @@ public class EditProfileTests : IntegrationTestBase
         Assert.Equal("https://example.com/avatar.png", body.ImageUrl);
     }
 
-    [Fact]
-    public async Task MultipleUsers_CanHaveNullUsername_Succeeds()
+    [Theory]
+    [InlineData("ab")]
+    [InlineData("invalid-char")]
+    [InlineData("admin")]
+    [InlineData("SETTINGS")]
+    public async Task InvalidOrReservedUsername_Returns400WithUsernameValidationError(string invalidUsername)
     {
         // Arrange
-        var (user1, cookie1) = await SeedAndSignIn("user1@example.com", "Sup3rSecret1!");
-        var (user2, cookie2) = await SeedAndSignIn("user2@example.com", "Sup3rSecret1!");
+        var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
 
-        // Act - both set only ImageUrl without a username
-        var response1 = await SendEditProfileRequest(cookie1, user1.Id,
-            new EditProfileRequest { Username = null, ImageUrl = "https://example.com/img1.png" });
-        var response2 = await SendEditProfileRequest(cookie2, user2.Id,
-            new EditProfileRequest { Username = null, ImageUrl = "https://example.com/img2.png" });
+        // Act
+        var response = await SendEditProfileRequest(cookie, user.Id,
+            new EditProfileRequest { Username = invalidUsername });
 
         // Assert
-        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, response2.StatusCode);
+        await response.AssertValidationProblemDetails("Username");
     }
 
     [Fact]
@@ -282,28 +282,29 @@ public class EditProfileTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task EmptyBody_NullUsernameAndNullImageUrl_Returns400()
+    public async Task MissingUsername_Returns400WithUsernameValidationError()
     {
         // Arrange
         var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
 
         // Act
         var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = null, ImageUrl = null });
+            new EditProfileRequest { Username = null!, ImageUrl = "https://example.com/img.png" });
 
         // Assert
-        await response.AssertProblemDetails(HttpStatusCode.BadRequest);
+        await response.AssertValidationProblemDetails("Username");
     }
 
     [Fact]
-    public async Task UsernameExceeds50Characters_Returns400WithUsernameValidationError()
+    public async Task UsernameExceedsMaxLength_Returns400WithUsernameValidationError()
     {
         // Arrange
         var (user, cookie) = await SeedAndSignIn("user@example.com", "Sup3rSecret1!");
+        const int UsernameMaxLength = 30;
 
         // Act
         var response = await SendEditProfileRequest(cookie, user.Id,
-            new EditProfileRequest { Username = new string('x', 51) });
+            new EditProfileRequest { Username = new string('x', UsernameMaxLength + 1) });
 
         // Assert
         await response.AssertValidationProblemDetails("Username");

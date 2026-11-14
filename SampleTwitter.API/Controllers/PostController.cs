@@ -239,7 +239,7 @@ public class PostController : ControllerBase
             result.ImageUrl,
             result.CreatedAt,
             result.UpdatedAt,
-            new PostAuthorDto(result.Author.Id, result.Author.Email),
+            new PostAuthorDto(result.Author.Id, result.Author.Username),
             result.ReplyId,
             result.RepostCount,
             result.ReplyCount,
@@ -247,7 +247,7 @@ public class PostController : ControllerBase
             result.IsReposted,
             result.ReplyToAuthor is null
                 ? null
-                : new PostAuthorDto(result.ReplyToAuthor.Id, result.ReplyToAuthor.Email));
+                : new PostAuthorDto(result.ReplyToAuthor.Id, result.ReplyToAuthor.Username));
 
         return Ok(response);
     }
@@ -275,7 +275,7 @@ public class PostController : ControllerBase
             r.ImageUrl,
             r.CreatedAt,
             r.UpdatedAt,
-            new PostAuthorDto(r.Author.Id, r.Author.Email),
+            new PostAuthorDto(r.Author.Id, r.Author.Username),
             id,
             r.RepostCount,
             r.ReplyCount,

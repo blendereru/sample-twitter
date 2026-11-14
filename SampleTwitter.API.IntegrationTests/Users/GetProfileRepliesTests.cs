@@ -89,7 +89,7 @@ public class GetProfileRepliesTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<ReplyFeedResponse>();
         Assert.NotNull(body);
         Assert.Equal(user.Id, body.Author.Id);
-        Assert.Equal(user.Email, body.Author.Email);
+        Assert.Equal(user.Username, body.Author.Username);
         Assert.Empty(body.Items);
     }
 
@@ -187,7 +187,7 @@ public class GetProfileRepliesTests : IntegrationTestBase
         Assert.Equal(root.Id, item.ParentPost.ReplyId);
         Assert.NotNull(item.ParentPost.ReplyToAuthor);
         Assert.Equal(userA.Id, item.ParentPost.ReplyToAuthor.Id);
-        Assert.Equal(userA.Email, item.ParentPost.ReplyToAuthor.Email);
+        Assert.Equal(userA.Username, item.ParentPost.ReplyToAuthor.Username);
     }
 
     [Fact]
@@ -341,7 +341,7 @@ public class GetProfileRepliesTests : IntegrationTestBase
 
         // Profile author mapping
         Assert.Equal(author.Id, body.Author.Id);
-        Assert.Equal(author.Email, body.Author.Email);
+        Assert.Equal(author.Username, body.Author.Username);
 
         // Reply item mapping
         var item = Assert.Single(body.Items);
@@ -360,7 +360,7 @@ public class GetProfileRepliesTests : IntegrationTestBase
         Assert.Null(item.ParentPost.UpdatedAt);
         Assert.NotNull(item.ParentPost.Author);
         Assert.Equal(parentAuthor.Id, item.ParentPost.Author.Id);
-        Assert.Equal(parentAuthor.Email, item.ParentPost.Author.Email);
+        Assert.Equal(parentAuthor.Username, item.ParentPost.Author.Username);
     }
 
     [Fact]

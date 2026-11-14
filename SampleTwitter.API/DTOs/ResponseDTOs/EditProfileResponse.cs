@@ -5,6 +5,6 @@ namespace SampleTwitter.API.DTOs.ResponseDTOs;
 /// </summary>
 public record EditProfileResponse(
     long Id,
-    string? Username,
+    string Username,
     string? ImageUrl,
     DateTimeOffset? UpdatedAt);

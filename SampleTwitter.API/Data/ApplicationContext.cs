@@ -20,8 +20,8 @@ public class ApplicationContext : DbContext
         modelBuilder.Entity<User>(builder =>
         {
             builder.HasIndex(u => u.Email).IsUnique();
-            builder.Property(u => u.Username).HasMaxLength(User.MaxUsernameLength);
-            builder.Property(u => u.NormalizedUsername).HasMaxLength(User.MaxUsernameLength);
+            builder.Property(u => u.Username).HasMaxLength(User.MaxUsernameLength).IsRequired();
+            builder.Property(u => u.NormalizedUsername).HasMaxLength(User.MaxUsernameLength).IsRequired();
             builder.HasIndex(u => u.NormalizedUsername).IsUnique();
         });
 

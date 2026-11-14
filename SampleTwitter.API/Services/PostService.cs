@@ -102,7 +102,7 @@ public class PostService : IPostService
                     viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
 
-        return new ProfilePostFeedResult(posts, new PostAuthorResult(user.Id, user.Email));
+        return new ProfilePostFeedResult(posts, new PostAuthorResult(user.Id, user.Username));
     }
 
     public async Task Delete(long postId, long userId, CancellationToken ct = default)
@@ -207,7 +207,7 @@ public class PostService : IPostService
                 r.Post.ImageUrl,
                 r.Post.CreatedAt,
                 r.Post.UpdatedAt,
-                new PostAuthorResult(r.Post.UserId, r.Post.User.Email),
+                new PostAuthorResult(r.Post.UserId, r.Post.User.Username),
                 r.Post.ReplyId,
                 r.Post.Reposts.Count,
                 r.Post.Replies.Count,
@@ -215,7 +215,7 @@ public class PostService : IPostService
                 viewerUserId.HasValue && r.Post.Reposts.Any(rep => rep.UserId == viewerUserId.Value),
                 r.Post.Reply == null
                     ? null
-                    : new PostAuthorResult(r.Post.Reply.UserId, r.Post.Reply.User.Email)))
+                    : new PostAuthorResult(r.Post.Reply.UserId, r.Post.Reply.User.Username)))
             .ToListAsync(ct);
     }
 
@@ -229,7 +229,7 @@ public class PostService : IPostService
                 p.ImageUrl,
                 p.CreatedAt,
                 p.UpdatedAt,
-                new PostAuthorResult(p.User.Id, p.User.Email),
+                new PostAuthorResult(p.User.Id, p.User.Username),
                 p.ReplyId,
                 p.Reposts.Count,
                 p.Replies.Count,
@@ -237,7 +237,7 @@ public class PostService : IPostService
                 viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value),
                 p.Reply == null
                     ? null
-                    : new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email)))
+                    : new PostAuthorResult(p.Reply.UserId, p.Reply.User.Username)))
             .SingleOrDefaultAsync(ct);
 
         if (post is null)
@@ -279,7 +279,7 @@ public class PostService : IPostService
                         p.Reply.ImageUrl,
                         p.Reply.CreatedAt,
                         p.Reply.UpdatedAt,
-                        new PostAuthorResult(p.Reply.UserId, p.Reply.User.Email),
+                        new PostAuthorResult(p.Reply.UserId, p.Reply.User.Username),
                         p.Reply.ReplyId,
                         p.Reply.Reposts.Count,
                         p.Reply.Replies.Count,
@@ -287,14 +287,14 @@ public class PostService : IPostService
                         viewerUserId.HasValue && p.Reply.Reposts.Any(r => r.UserId == viewerUserId.Value),
                         p.Reply.Reply == null
                             ? null
-                            : new PostAuthorResult(p.Reply.Reply.UserId, p.Reply.Reply.User.Email)),
+                            : new PostAuthorResult(p.Reply.Reply.UserId, p.Reply.Reply.User.Username)),
                 p.Reposts.Count,
                 p.Replies.Count,
                 viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
                 viewerUserId.HasValue && p.Reposts.Any(r => r.UserId == viewerUserId.Value)))
             .ToListAsync(ct);
 
-        return new ProfileReplyFeedResult(repliesFeed, new PostAuthorResult(user.Id, user.Email));
+        return new ProfileReplyFeedResult(repliesFeed, new PostAuthorResult(user.Id, user.Username));
     }
 
     public async Task<List<ReplyFeedResult>> GetReplies(long postId, long? viewerUserId = null, CancellationToken ct = default)
@@ -317,7 +317,7 @@ public class PostService : IPostService
                 p.ImageUrl,
                 p.CreatedAt,
                 p.UpdatedAt,
-                new PostAuthorResult(p.UserId, p.User.Email),
+                new PostAuthorResult(p.UserId, p.User.Username),
                 p.Reposts.Count,
                 p.Replies.Count,
                 viewerUserId.HasValue && p.Bookmarks.Any(b => b.UserId == viewerUserId.Value),
@@ -409,14 +409,14 @@ public class PostService : IPostService
                 b.Post.ImageUrl,
                 b.Post.CreatedAt,
                 b.Post.UpdatedAt,
-                new PostAuthorResult(b.Post.UserId, b.Post.User.Email),
+                new PostAuthorResult(b.Post.UserId, b.Post.User.Username),
                 b.Post.ReplyId,
                 b.Post.Reposts.Count,
                 b.Post.Replies.Count,
                 b.Post.Reposts.Any(r => r.UserId == userId),
                 b.Post.Reply == null
                     ? null
-                    : new PostAuthorResult(b.Post.Reply.UserId, b.Post.Reply.User.Email)))
+                    : new PostAuthorResult(b.Post.Reply.UserId, b.Post.Reply.User.Username)))
             .ToListAsync(ct);
     }
 

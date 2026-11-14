@@ -5,15 +5,17 @@ import InputField from '@/components/common/InputField.vue';
 import AlertBanner from '@/components/common/AlertBanner.vue';
 import { signUp, resendConfirmationEmail } from '@/api/account';
 import { parseApiError } from '@/api/client';
+import { validateUsername, USERNAME_MAX_LENGTH } from '@/utils/username';
 import type { SignUpResponse } from '@/types/api';
 
 const email = ref('');
+const username = ref('');
 const password = ref('');
 const loading = ref(false);
 const resending = ref(false);
 const resendMessage = ref<string | null>(null);
 const globalError = ref<string | null>(null);
-const fieldErrors = ref<{ email?: string; password?: string }>({});
+const fieldErrors = ref<{ email?: string; username?: string; password?: string }>({});
 const successResponse = ref<SignUpResponse | null>(null);
 
 function validateClient(): boolean {
@@ -26,6 +28,14 @@ function validateClient(): boolean {
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
     fieldErrors.value.email = 'The Email field is not a valid e-mail address.';
     valid = false;
+  }
+
+  if (username.value.trim()) {
+    const usernameError = validateUsername(username.value);
+    if (usernameError) {
+      fieldErrors.value.username = usernameError;
+      valid = false;
+    }
   }
 
   if (!password.value) {
@@ -48,6 +58,7 @@ async function handleSubmit() {
     const res = await signUp({
       email: email.value.trim(),
       password: password.value,
+      username: username.value.trim() || null,
     });
     successResponse.value = res;
   } catch (err: unknown) {
@@ -57,12 +68,17 @@ async function handleSubmit() {
       if (parsed.fieldErrors.Email?.length) {
         fieldErrors.value.email = parsed.fieldErrors.Email[0];
       }
+      if (parsed.fieldErrors.Username?.length) {
+        fieldErrors.value.username = parsed.fieldErrors.Username[0];
+      }
       if (parsed.fieldErrors.Password?.length) {
         fieldErrors.value.password = parsed.fieldErrors.Password[0];
       }
     }
 
-    if (parsed.status === 409) {
+    if (parsed.status === 409 && parsed.title === 'Username taken') {
+      fieldErrors.value.username = parsed.detail || 'This username is already taken.';
+    } else if (parsed.status === 409) {
       globalError.value = parsed.detail || 'A confirmed account already exists for this email address.';
     } else if (!parsed.fieldErrors || Object.keys(parsed.fieldErrors).length === 0) {
       globalError.value = parsed.detail || parsed.message || 'An error occurred during registration.';
@@ -140,6 +156,16 @@ async function handleResend() {
           :error="fieldErrors.email"
           :disabled="loading"
           required
+        />
+
+        <InputField
+          id="signup-username"
+          label="Username (optional)"
+          type="text"
+          v-model="username"
+          :placeholder="`3–${USERNAME_MAX_LENGTH} letters, digits or _ — leave empty for a random one`"
+          :error="fieldErrors.username"
+          :disabled="loading"
         />
 
         <InputField

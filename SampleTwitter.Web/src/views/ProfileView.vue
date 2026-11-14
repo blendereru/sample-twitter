@@ -44,9 +44,6 @@ const profileEmail = computed(() => {
   if (userInfo.value?.email) {
     return userInfo.value.email;
   }
-  if (profileAuthor.value?.email) {
-    return profileAuthor.value.email;
-  }
   if (isMyProfile.value && authStore.currentUserEmail) {
     return authStore.currentUserEmail;
   }
@@ -56,6 +53,9 @@ const profileEmail = computed(() => {
 const profileDisplayName = computed(() => {
   if (userInfo.value?.username) {
     return userInfo.value.username;
+  }
+  if (profileAuthor.value?.username) {
+    return profileAuthor.value.username;
   }
   if (isMyProfile.value && authStore.currentUsername) {
     return authStore.currentUsername;
@@ -149,7 +149,7 @@ function getAuthorDisplayName(author: PostAuthorDto): string {
   if (authStore.currentUserId && Number(authStore.currentUserId) === author.id && authStore.currentUsername) {
     return authStore.currentUsername;
   }
-  return author.email.split('@')[0];
+  return author.username;
 }
 
 const isFollowLoading = ref(false);
@@ -202,11 +202,11 @@ async function handleToggleFollow() {
   }
 }
 
-function handleProfileUpdated(payload: { username?: string | null; imageUrl?: string | null; updatedAt?: string | null }) {
+function handleProfileUpdated(payload: { username: string; imageUrl?: string | null; updatedAt?: string | null }) {
   if (userInfo.value) {
     userInfo.value = {
       ...userInfo.value,
-      username: payload.username ?? null,
+      username: payload.username,
       imageUrl: payload.imageUrl ?? null,
       updatedAt: payload.updatedAt ?? new Date().toISOString(),
     };
@@ -755,10 +755,10 @@ watch(
                       @click.stop="router.push(`/profile/${reply.parentPost.author.id}`)"
                       class="font-bold text-white hover:underline"
                     >
-                      {{ reply.parentPost.author.email.split('@')[0] }}
+                      {{ getAuthorDisplayName(reply.parentPost.author) }}
                     </span>
                     <span class="text-neutral-500">
-                      @{{ reply.parentPost.author.email }}
+                      @{{ reply.parentPost.author.username }}
                     </span>
                   </template>
                   <span v-else class="font-bold text-neutral-300">
@@ -778,7 +778,7 @@ watch(
                     @click.stop="router.push(`/profile/${reply.parentPost.replyToAuthor.id}`)"
                     class="text-sky-500 font-medium hover:underline cursor-pointer"
                   >
-                    @{{ reply.parentPost.replyToAuthor.email.split('@')[0] }}
+                    @{{ reply.parentPost.replyToAuthor.username }}
                   </span>
                   <span v-else class="text-neutral-500 italic">
                     a deleted post
@@ -876,7 +876,7 @@ watch(
               :id="repost.id"
               :user-id="repost.author.id"
               :author="getAuthorDisplayName(repost.author)"
-              :handle="'@' + repost.author.email"
+              :handle="'@' + repost.author.username"
               :avatar="getAvatar(repost.author.id)"
               :content="repost.text || ''"
               :image-url="repost.imageUrl"

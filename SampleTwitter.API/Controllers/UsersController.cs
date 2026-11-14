@@ -53,7 +53,7 @@ public class UsersController : ControllerBase
                 i.IsReposted))
             .ToList();
 
-        return Ok(new PostFeedResponse(items, new PostAuthorDto(feed.Author.Id, feed.Author.Email)));
+        return Ok(new PostFeedResponse(items, new PostAuthorDto(feed.Author.Id, feed.Author.Username)));
     }
 
     /// <summary>
@@ -98,7 +98,7 @@ public class UsersController : ControllerBase
             r.ImageUrl,
             r.CreatedAt,
             r.UpdatedAt,
-            new PostAuthorDto(r.Author.Id, r.Author.Email),
+            new PostAuthorDto(r.Author.Id, r.Author.Username),
             r.ReplyId,
             r.RepostCount,
             r.ReplyCount,
@@ -106,7 +106,7 @@ public class UsersController : ControllerBase
             r.IsReposted,
             r.ReplyToAuthor is null
                 ? null
-                : new PostAuthorDto(r.ReplyToAuthor.Id, r.ReplyToAuthor.Email))).ToList();
+                : new PostAuthorDto(r.ReplyToAuthor.Id, r.ReplyToAuthor.Username))).ToList();
 
         return Ok(response);
     }
@@ -138,7 +138,7 @@ public class UsersController : ControllerBase
             b.ImageUrl,
             b.CreatedAt,
             b.UpdatedAt,
-            new PostAuthorDto(b.Author.Id, b.Author.Email),
+            new PostAuthorDto(b.Author.Id, b.Author.Username),
             b.ReplyId,
             b.RepostCount,
             b.ReplyCount,
@@ -146,7 +146,7 @@ public class UsersController : ControllerBase
             b.IsReposted,
             b.ReplyToAuthor is null
                 ? null
-                : new PostAuthorDto(b.ReplyToAuthor.Id, b.ReplyToAuthor.Email))).ToList();
+                : new PostAuthorDto(b.ReplyToAuthor.Id, b.ReplyToAuthor.Username))).ToList();
 
         return Ok(response);
     }

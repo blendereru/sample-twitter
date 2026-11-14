@@ -166,15 +166,15 @@ public class GetRepliesTests : IntegrationTestBase
 
         Assert.Equal(replyFromC.Id, body[0].Id);
         Assert.Equal(userC.Id, body[0].Author.Id);
-        Assert.Equal(userC.Email, body[0].Author.Email);
+        Assert.Equal(userC.Username, body[0].Author.Username);
 
         Assert.Equal(replyFromB.Id, body[1].Id);
         Assert.Equal(userB.Id, body[1].Author.Id);
-        Assert.Equal(userB.Email, body[1].Author.Email);
+        Assert.Equal(userB.Username, body[1].Author.Username);
 
         Assert.Equal(replyFromAuthor.Id, body[2].Id);
         Assert.Equal(author.Id, body[2].Author.Id);
-        Assert.Equal(author.Email, body[2].Author.Email);
+        Assert.Equal(author.Username, body[2].Author.Username);
     }
 
     [Fact]
@@ -358,7 +358,7 @@ public class GetRepliesTests : IntegrationTestBase
         Assert.Equal(replyTime.ToUnixTimeSeconds(), item.CreatedAt.ToUnixTimeSeconds());
         Assert.NotNull(item.UpdatedAt);
         Assert.Equal(replyAuthor.Id, item.Author.Id);
-        Assert.Equal(replyAuthor.Email, item.Author.Email);
+        Assert.Equal(replyAuthor.Username, item.Author.Username);
         Assert.Equal(parentPost.Id, item.ReplyId);
         Assert.Equal(0, item.RepostCount);
         Assert.Equal(0, item.ReplyCount);
@@ -574,6 +574,6 @@ public class GetRepliesTests : IntegrationTestBase
         Assert.Equal("https://example.com/reply-pic.png", item.ImageUrl);
         Assert.Equal(createdParent.PostId, item.ReplyId);
         Assert.Equal(replier.Id, item.Author.Id);
-        Assert.Equal(replier.Email, item.Author.Email);
+        Assert.Equal(replier.Username, item.Author.Username);
     }
 }

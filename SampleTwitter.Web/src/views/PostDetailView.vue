@@ -384,9 +384,9 @@ watch(
               @click.stop="router.push(`/profile/${parentPost.author.id}`)"
               class="font-bold text-white hover:underline"
             >
-              {{ parentPost.author.email.split('@')[0] }}
+              {{ parentPost.author.username }}
             </span>
-            <span class="text-neutral-500">@{{ parentPost.author.email }}</span>
+            <span class="text-neutral-500">@{{ parentPost.author.username }}</span>
             <span class="text-neutral-600">·</span>
             <span class="text-neutral-500 hover:underline">{{ formatDate(parentPost.createdAt) }}</span>
           </div>
@@ -401,7 +401,7 @@ watch(
               @click.stop="router.push(`/profile/${parentPost.replyToAuthor.id}`)"
               class="text-sky-500 font-medium hover:underline cursor-pointer"
             >
-              @{{ parentPost.replyToAuthor.email.split('@')[0] }}
+              @{{ parentPost.replyToAuthor.username }}
             </span>
             <span v-else class="text-neutral-500 italic">
               a deleted post
@@ -437,8 +437,8 @@ watch(
       <TweetCard
         :id="post.id"
         :user-id="post.author.id"
-        :author="post.author.email.split('@')[0]"
-        :handle="'@' + post.author.email"
+        :author="post.author.username"
+        :handle="'@' + post.author.username"
         :avatar="getAvatar(post.author.id)"
         :content="post.text || ''"
         :image-url="post.imageUrl"
@@ -464,7 +464,7 @@ watch(
       <!-- Reply Composer -->
       <div v-if="authStore.isAuthenticated" class="p-4 border-b border-neutral-800 flex flex-col gap-2">
         <div class="text-xs text-neutral-500 ml-13">
-          Replying to <span class="text-sky-400">@{{ post.author.email }}</span>
+          Replying to <span class="text-sky-400">@{{ post.author.username }}</span>
         </div>
 
         <div v-if="replySubmitError" class="text-xs text-red-400 bg-red-950/40 border border-red-800/80 rounded-lg p-2.5">
@@ -568,8 +568,8 @@ watch(
           :key="reply.id"
           :id="reply.id"
           :user-id="reply.author.id"
-          :author="reply.author.email.split('@')[0]"
-          :handle="'@' + reply.author.email"
+          :author="reply.author.username"
+          :handle="'@' + reply.author.username"
           :avatar="getAvatar(reply.author.id)"
           :content="reply.text || ''"
           :image-url="reply.imageUrl"

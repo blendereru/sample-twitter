@@ -10,6 +10,7 @@ import { changeEmail, changePassword } from '@/api/account';
 import { uploadImage, validateImageFile, ALLOWED_IMAGE_ACCEPT } from '@/api/images';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { validateUsername, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH } from '@/utils/username';
 
 const props = defineProps<{
   userId: number;
@@ -20,7 +21,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'profile-updated', payload: { username?: string | null; imageUrl?: string | null; updatedAt?: string | null }): void;
+  (e: 'profile-updated', payload: { username: string; imageUrl?: string | null; updatedAt?: string | null }): void;
 }>();
 
 const router = useRouter();
@@ -74,16 +75,9 @@ function validateProfile(): boolean {
   profileFieldErrors.value = {};
   profileError.value = null;
 
-  const trimmedUsername = username.value.trim();
-  const trimmedImage = imageUrl.value.trim();
-
-  if (!trimmedUsername && !trimmedImage) {
-    profileError.value = 'Please provide at least a display name or upload a profile photo.';
-    return false;
-  }
-
-  if (trimmedUsername.length > 50) {
-    profileFieldErrors.value.username = 'Username cannot exceed 50 characters.';
+  const usernameError = validateUsername(username.value);
+  if (usernameError) {
+    profileFieldErrors.value.username = usernameError;
     return false;
   }
 
@@ -98,7 +92,7 @@ async function handleSaveProfile() {
   profileLoading.value = true;
   try {
     const res = await editProfile(props.userId, {
-      username: username.value.trim() ? username.value.trim() : null,
+      username: username.value.trim(),
       imageUrl: imageUrl.value.trim() ? imageUrl.value.trim() : null,
     });
 
@@ -395,15 +389,16 @@ async function handleSavePassword() {
           <div class="flex flex-col gap-1">
             <InputField
               id="edit-profile-username"
-              label="Display Name"
+              label="Username"
               type="text"
               v-model="username"
-              placeholder="Your display name (max 50 characters)"
+              :placeholder="`${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} letters, digits or underscores`"
               :error="profileFieldErrors.username"
               :disabled="profileLoading"
+              required
             />
             <div class="flex justify-end text-xs text-neutral-500">
-              {{ username.trim().length }} / 50
+              {{ username.trim().length }} / {{ USERNAME_MAX_LENGTH }}
             </div>
           </div>
 

@@ -14,10 +14,14 @@ namespace SampleTwitter.API.Services;
 
 public class AccountService : IAccountService
 {
+    private const string UsernameUniqueIndexName = "IX_Users_NormalizedUsername";
+    private const int MaxUsernameGenerationAttempts = 5;
+
     private readonly ApplicationContext _applicationContext;
     private readonly IEmailConfirmationService _emailConfirmationService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ISecureTokenGenerator _tokenGenerator;
+    private readonly IUsernameGenerator _usernameGenerator;
     private readonly IEmailSender _emailSender;
     private readonly AppOptions _options;
     private readonly ILogger<AccountService> _logger;
@@ -27,6 +31,7 @@ public class AccountService : IAccountService
         IEmailConfirmationService emailConfirmationService,
         IPasswordHasher passwordHasher,
         ISecureTokenGenerator tokenGenerator,
+        IUsernameGenerator usernameGenerator,
         IEmailSender emailSender,
         IOptions<AppOptions> options,
         ILogger<AccountService> logger)
@@ -35,6 +40,7 @@ public class AccountService : IAccountService
         _emailConfirmationService = emailConfirmationService;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
+        _usernameGenerator = usernameGenerator;
         _emailSender = emailSender;
         _options = options.Value;
         _logger = logger;
@@ -43,6 +49,7 @@ public class AccountService : IAccountService
     public async Task<RegisterResult> Register(SignUpRequest request, CancellationToken ct = default)
     {
         var normalizedEmail = User.NormalizeEmail(request.Email);
+        var requestedUsername = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim();
 
         using var _ = LogContext.PushProperty("Email", normalizedEmail);
 
@@ -53,19 +60,39 @@ public class AccountService : IAccountService
 
         if (existingUser is not null)
         {
-            existingUser.RenewRegistration(_passwordHasher.Hash(request.Password));
+            existingUser.RenewRegistration(_passwordHasher.Hash(request.Password), requestedUsername);
+
+            if (requestedUsername is not null)
+            {
+                await EnsureUsernameIsAvailable(existingUser.NormalizedUsername, existingUser.Id, ct);
+            }
 
             _logger.LogInformation(
                 "Existing unconfirmed registration found for user {UserId} — resending confirmation",
                 existingUser.Id);
 
-            await _applicationContext.SaveChangesAsync(ct);
+            try
+            {
+                await _applicationContext.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex, UsernameUniqueIndexName))
+            {
+                _logger.LogWarning(ex, "Race condition: duplicate username detected during registration renewal for user {UserId}", existingUser.Id);
+                throw new UsernameTakenException($"Username '{requestedUsername}' is already taken (race condition).");
+            }
+
             await _emailConfirmationService.SendConfirmationEmail(existingUser.Id, existingUser.Email, ct);
 
             return new RegisterResult(existingUser.Id, existingUser.Email, IsNewRegistration: false);
         }
 
-        var user = User.Register(normalizedEmail, _passwordHasher.Hash(request.Password));
+        var username = requestedUsername ?? await GenerateUniqueUsername(ct);
+        var user = User.Register(normalizedEmail, _passwordHasher.Hash(request.Password), username);
+
+        if (requestedUsername is not null)
+        {
+            await EnsureUsernameIsAvailable(user.NormalizedUsername, excludedUserId: null, ct);
+        }
 
         _applicationContext.Users.Add(user);
 
@@ -73,13 +100,21 @@ public class AccountService : IAccountService
         {
             await _applicationContext.SaveChangesAsync(ct);
         }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex, UsernameUniqueIndexName))
+        {
+            _logger.LogWarning(ex, "Race condition: duplicate username detected during registration");
+            throw new UsernameTakenException($"Username '{username}' is already taken (race condition).");
+        }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
             _logger.LogWarning(ex, "Race condition: duplicate registration attempt detected during save");
             throw new ConflictException($"User with email {normalizedEmail} already exists (race condition).");
         }
 
-        _logger.LogInformation("New user registered with id {UserId}", user.Id);
+        _logger.LogInformation(
+            "New user registered with id {UserId} ({UsernameSource} username)",
+            user.Id,
+            requestedUsername is null ? "generated" : "chosen");
 
         await _emailConfirmationService.SendConfirmationEmail(user.Id, user.Email, ct);
 
@@ -159,20 +194,15 @@ public class AccountService : IAccountService
             throw new ForbiddenException($"User {currentUserId} attempted to edit profile of user {id}.");
         }
 
-        var normalizedUsername = string.IsNullOrWhiteSpace(request.Username)
-            ? null
-            : User.NormalizeUsername(request.Username);
+        var normalizedUsername = User.NormalizeUsername(request.Username);
 
-        if (normalizedUsername is not null)
+        var usernameTaken = await _applicationContext.Users
+            .AnyAsync(u => u.Id != id && u.NormalizedUsername == normalizedUsername, ct);
+
+        if (usernameTaken)
         {
-            var usernameTaken = await _applicationContext.Users
-                .AnyAsync(u => u.Id != id && u.NormalizedUsername == normalizedUsername, ct);
-
-            if (usernameTaken)
-            {
-                _logger.LogWarning("Edit profile failed — username '{Username}' is already taken", request.Username);
-                throw new UsernameTakenException($"Username '{request.Username}' is already taken.");
-            }
+            _logger.LogWarning("Edit profile failed — username '{Username}' is already taken", request.Username);
+            throw new UsernameTakenException($"Username '{request.Username}' is already taken.");
         }
 
         user.UpdateProfile(request.Username, request.ImageUrl);
@@ -422,8 +452,44 @@ public class AccountService : IAccountService
         _logger.LogInformation("User {FollowerId} unfollowed user {FollowingId}", currentUserId, followId);
     }
 
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    private async Task EnsureUsernameIsAvailable(string normalizedUsername, long? excludedUserId, CancellationToken ct)
     {
-        return ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresErrorCodes.UniqueViolation;
+        var usernameTaken = await _applicationContext.Users
+            .AnyAsync(u => u.NormalizedUsername == normalizedUsername && (excludedUserId == null || u.Id != excludedUserId), ct);
+
+        if (usernameTaken)
+        {
+            _logger.LogWarning("Registration failed — username '{NormalizedUsername}' is already taken", normalizedUsername);
+            throw new UsernameTakenException($"Username '{normalizedUsername}' is already taken.");
+        }
+    }
+
+    private async Task<string> GenerateUniqueUsername(CancellationToken ct)
+    {
+        for (var attempt = 1; attempt <= MaxUsernameGenerationAttempts; attempt++)
+        {
+            var candidate = _usernameGenerator.Generate();
+            var normalizedCandidate = User.NormalizeUsername(candidate);
+
+            var taken = await _applicationContext.Users
+                .AnyAsync(u => u.NormalizedUsername == normalizedCandidate, ct);
+
+            if (!taken)
+            {
+                return candidate;
+            }
+
+            _logger.LogWarning("Generated username collided with an existing account (attempt {Attempt})", attempt);
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to generate a unique username after {MaxUsernameGenerationAttempts} attempts.");
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex, string? constraintName = null)
+    {
+        return ex.InnerException is PostgresException pgEx
+               && pgEx.SqlState == PostgresErrorCodes.UniqueViolation
+               && (constraintName is null || pgEx.ConstraintName == constraintName);
     }
 }
