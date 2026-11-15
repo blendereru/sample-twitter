@@ -15,12 +15,17 @@ public class AccountController : ControllerBase
 {
     private readonly IAccountService _accountService;
     private readonly IEmailConfirmationService _emailConfirmationService;
+    private readonly IPasswordResetService _passwordResetService;
     private readonly ILogger<AccountController> _logger;
-    public AccountController(IAccountService accountService, IEmailConfirmationService emailConfirmationService,
+    public AccountController(
+        IAccountService accountService,
+        IEmailConfirmationService emailConfirmationService,
+        IPasswordResetService passwordResetService,
         ILogger<AccountController> logger)
     {
         _accountService = accountService;
         _emailConfirmationService = emailConfirmationService;
+        _passwordResetService = passwordResetService;
         _logger = logger;
     }
 
@@ -269,7 +274,7 @@ public class AccountController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken ct)
     {
-        await _accountService.ForgotPassword(request, ct);
+        await _passwordResetService.ForgotPassword(request, ct);
 
         return Ok(new ForgotPasswordResponse(
             "If a confirmed account with that email exists, a password reset link has been sent."));
@@ -288,7 +293,7 @@ public class AccountController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken ct)
     {
-        await _accountService.ResetPassword(request, ct);
+        await _passwordResetService.ResetPassword(request, ct);
 
         return Ok(new ResetPasswordResponse("Your password has been reset successfully. You can now sign in."));
     }

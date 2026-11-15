@@ -19,8 +19,12 @@ public class EmailConfirmationService : IEmailConfirmationService
     private readonly AppOptions _options;
     private readonly ILogger<EmailConfirmationService> _logger;
 
-    public EmailConfirmationService(ApplicationContext applicationContext, ISecureTokenGenerator tokenGenerator,
-        IEmailSender emailSender, IOptions<AppOptions> options, ILogger<EmailConfirmationService> logger)
+    public EmailConfirmationService(
+        ApplicationContext applicationContext,
+        ISecureTokenGenerator tokenGenerator,
+        IEmailSender emailSender,
+        IOptions<AppOptions> options,
+        ILogger<EmailConfirmationService> logger)
     {
         _applicationContext = applicationContext;
         _tokenGenerator = tokenGenerator;
