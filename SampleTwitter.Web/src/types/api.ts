@@ -262,6 +262,7 @@ export interface MessageResponse {
   senderUsername: string;
   text: string;
   sentAt: string;
+  readAt?: string | null;
   pending?: boolean;
 }
 

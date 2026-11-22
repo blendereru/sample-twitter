@@ -6,4 +6,5 @@ public record MessageResult(
     long SenderId,
     string SenderUsername,
     string Text,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt,
+    DateTimeOffset? ReadAt = null);

@@ -205,4 +205,32 @@ public class ConversationTests
         // Act & Assert
         Assert.Throws<ForbiddenException>(() => conversation.GetOtherParticipantId(99));
     }
+
+    [Fact]
+    public void MarkAsRead_StampsReadAtOnceOnUnreadMessagesFromOtherParticipant()
+    {
+        // Arrange
+        var conversation = Conversation.Start(1, 2, FixedNow);
+        var msg1 = conversation.SendMessage(1, "First from A", FixedNow.AddMinutes(1));
+        var msgFromB = conversation.SendMessage(2, "Reply from B", FixedNow.AddMinutes(2));
+        var firstReadAt = FixedNow.AddMinutes(5);
+        var msg2 = conversation.SendMessage(1, "Second from A", FixedNow.AddMinutes(10));
+        var secondReadAt = FixedNow.AddMinutes(15);
+
+        // Act: B reads at +5m
+        conversation.MarkAsRead(2, firstReadAt);
+
+        // Assert: msg1 is stamped at firstReadAt; msgFromB (sent by reader) and msg2 (sent after +5m) stay null
+        Assert.Equal(firstReadAt, msg1.ReadAt);
+        Assert.Null(msgFromB.ReadAt);
+        Assert.Null(msg2.ReadAt);
+
+        // Act: B reads again at +15m
+        conversation.MarkAsRead(2, secondReadAt);
+
+        // Assert: msg1 preserves its original ReadAt; msg2 gets secondReadAt
+        Assert.Equal(firstReadAt, msg1.ReadAt);
+        Assert.Equal(secondReadAt, msg2.ReadAt);
+        Assert.Null(msgFromB.ReadAt);
+    }
 }

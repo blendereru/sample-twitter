@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Loader2, Send, Check, CheckCheck } from 'lucide-vue-next';
+import { ArrowLeft, Loader2, Send, Check, CheckCheck, Copy, Clock } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { parseApiError } from '@/api/client';
+import type { MessageResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,6 +26,8 @@ const loadingOlder = ref(false);
 const error = ref<string | null>(null);
 const sendError = ref<string | null>(null);
 const bottomAnchorRef = ref<HTMLElement | null>(null);
+const activeMenuMessageId = ref<number | null>(null);
+const copiedMessageId = ref<number | null>(null);
 
 const remainingChars = computed(() => 1000 - messageText.value.length);
 const canSend = computed(() =>
@@ -49,10 +52,76 @@ function formatMessageTime(dateStr: string): string {
   }
 }
 
-function isMessageReadByOther(sentAt: string): boolean {
+function formatFullReadTime(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const isSameDay =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+
+    const timePart = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+    if (isSameDay) {
+      return `Today at ${timePart}`;
+    }
+
+    const datePart = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+    return `${datePart}, ${timePart}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function getMessageReadAt(msg: MessageResponse): string | null {
+  if (msg.readAt) return msg.readAt;
   const otherLastRead = conversation.value?.otherParticipantLastReadAt;
-  if (!otherLastRead) return false;
-  return new Date(otherLastRead).getTime() >= new Date(sentAt).getTime();
+  if (otherLastRead && new Date(otherLastRead).getTime() >= new Date(msg.sentAt).getTime()) {
+    return otherLastRead;
+  }
+  return null;
+}
+
+function isMessageReadByOther(msg: MessageResponse): boolean {
+  return getMessageReadAt(msg) !== null;
+}
+
+function toggleMessageMenu(messageId: number, pending?: boolean) {
+  if (pending) return;
+  activeMenuMessageId.value = activeMenuMessageId.value === messageId ? null : messageId;
+}
+
+function closeMessageMenu() {
+  activeMenuMessageId.value = null;
+}
+
+async function copyMessageText(msg: MessageResponse) {
+  try {
+    await navigator.clipboard.writeText(msg.text);
+    copiedMessageId.value = msg.id;
+    setTimeout(() => {
+      if (copiedMessageId.value === msg.id) {
+        copiedMessageId.value = null;
+      }
+    }, 1500);
+  } catch {
+    // Clipboard access may be blocked in non-HTTPS contexts.
+  } finally {
+    closeMessageMenu();
+  }
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && activeMenuMessageId.value !== null) {
+    closeMessageMenu();
+  }
 }
 
 async function scrollToBottom() {
@@ -135,10 +204,14 @@ watch(
 );
 
 onMounted(() => {
+  window.addEventListener('click', closeMessageMenu);
+  window.addEventListener('keydown', handleKeydown);
   void loadThread(conversationId.value);
 });
 
 onUnmounted(() => {
+  window.removeEventListener('click', closeMessageMenu);
+  window.removeEventListener('keydown', handleKeydown);
   chatStore.closeConversation(conversationId.value);
 });
 </script>
@@ -216,25 +289,82 @@ onUnmounted(() => {
         v-for="msg in messages"
         :key="msg.id"
         :class="[
-          'flex flex-col max-w-[78%]',
+          'relative flex flex-col max-w-[78%]',
           msg.senderId === authStore.currentUserId ? 'self-end items-end' : 'self-start items-start'
         ]"
       >
         <div
+          @click.stop="toggleMessageMenu(msg.id, msg.pending)"
           :class="[
-            'px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words',
+            'px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words transition-all',
             msg.senderId === authStore.currentUserId
               ? 'bg-sky-500 text-white rounded-br-sm'
               : 'bg-neutral-800 text-neutral-100 rounded-bl-sm',
-            msg.pending ? 'opacity-70' : ''
+            msg.pending ? 'opacity-70' : 'cursor-pointer hover:brightness-110',
+            activeMenuMessageId === msg.id ? 'ring-2 ring-white/40' : ''
           ]"
         >
           {{ msg.text }}
         </div>
+
+        <!-- Message Actions Dropdown -->
+        <div
+          v-if="activeMenuMessageId === msg.id"
+          @click.stop
+          :class="[
+            'mt-1.5 z-30 min-w-[210px] bg-black border border-neutral-800 rounded-2xl shadow-2xl py-1.5 overflow-hidden select-none',
+            msg.senderId === authStore.currentUserId ? 'self-end' : 'self-start'
+          ]"
+        >
+          <div
+            v-if="msg.senderId === authStore.currentUserId"
+            class="px-3.5 py-2 text-xs flex items-center gap-2.5 border-b border-neutral-800/80"
+          >
+            <template v-if="getMessageReadAt(msg)">
+              <CheckCheck class="w-4 h-4 text-sky-400 shrink-0" />
+              <div class="flex flex-col">
+                <span class="font-semibold text-white">
+                  Read by @{{ conversation?.otherParticipant.username || 'user' }}
+                </span>
+                <span class="text-neutral-400">
+                  {{ formatFullReadTime(getMessageReadAt(msg)!) }}
+                </span>
+              </div>
+            </template>
+            <template v-else>
+              <Check class="w-4 h-4 text-neutral-500 shrink-0" />
+              <div class="flex flex-col">
+                <span class="font-semibold text-neutral-300">Delivered</span>
+                <span class="text-neutral-500">Not read yet</span>
+              </div>
+            </template>
+          </div>
+
+          <div
+            v-else
+            class="px-3.5 py-2 text-xs flex items-center gap-2.5 border-b border-neutral-800/80"
+          >
+            <Clock class="w-4 h-4 text-neutral-400 shrink-0" />
+            <div class="flex flex-col">
+              <span class="font-semibold text-neutral-200">Sent</span>
+              <span class="text-neutral-400">{{ formatFullReadTime(msg.sentAt) }}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            @click="copyMessageText(msg)"
+            class="w-full px-3.5 py-2 text-left text-xs text-neutral-200 hover:bg-neutral-900 flex items-center gap-2.5 transition-colors font-medium cursor-pointer"
+          >
+            <Copy class="w-3.5 h-3.5 text-neutral-400" />
+            <span>{{ copiedMessageId === msg.id ? 'Copied!' : 'Copy text' }}</span>
+          </button>
+        </div>
+
         <div class="flex items-center gap-1 mt-0.5 px-1 text-[11px] text-neutral-500">
           <span>{{ msg.pending ? 'Sending...' : formatMessageTime(msg.sentAt) }}</span>
           <template v-if="msg.senderId === authStore.currentUserId && !msg.pending">
-            <CheckCheck v-if="isMessageReadByOther(msg.sentAt)" class="w-3.5 h-3.5 text-sky-400" />
+            <CheckCheck v-if="isMessageReadByOther(msg)" class="w-3.5 h-3.5 text-sky-400" />
             <Check v-else class="w-3.5 h-3.5 text-neutral-500" />
           </template>
         </div>

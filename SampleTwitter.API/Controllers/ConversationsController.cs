@@ -81,7 +81,8 @@ public class ConversationsController : ControllerBase
                     c.LastMessage.SenderId,
                     c.LastMessage.SenderUsername,
                     c.LastMessage.Text,
-                    c.LastMessage.SentAt),
+                    c.LastMessage.SentAt,
+                    c.LastMessage.ReadAt),
             c.UnreadCount,
             c.OtherParticipantLastReadAt)).ToList();
 
@@ -113,7 +114,8 @@ public class ConversationsController : ControllerBase
             m.SenderId,
             m.SenderUsername,
             m.Text,
-            m.SentAt)).ToList();
+            m.SentAt,
+            m.ReadAt)).ToList();
 
         return Ok(response);
     }
@@ -140,7 +142,8 @@ public class ConversationsController : ControllerBase
             result.SenderId,
             result.SenderUsername,
             result.Text,
-            result.SentAt);
+            result.SentAt,
+            result.ReadAt);
 
         return CreatedAtAction(nameof(GetMessages), new { id = result.ConversationId }, response);
     }

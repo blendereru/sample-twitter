@@ -133,7 +133,8 @@ public class MessagingService : IMessagingService
                         m.SenderId,
                         m.Sender.Username,
                         m.Text,
-                        m.SentAt))
+                        m.SentAt,
+                        m.ReadAt))
                     .FirstOrDefault(),
                 c.Messages.Count(m =>
                     m.SenderId != currentUserId &&
@@ -193,7 +194,8 @@ public class MessagingService : IMessagingService
                     m.SenderId,
                     m.Sender.Username,
                     m.Text,
-                    m.SentAt))
+                    m.SentAt,
+                    m.ReadAt))
                 .ToListAsync(ct);
         }
 
@@ -212,7 +214,8 @@ public class MessagingService : IMessagingService
                 m.SenderId,
                 m.Sender.Username,
                 m.Text,
-                m.SentAt))
+                m.SentAt,
+                m.ReadAt))
             .ToListAsync(ct);
     }
 
@@ -283,6 +286,7 @@ public class MessagingService : IMessagingService
     public async Task MarkAsRead(long conversationId, long currentUserId, CancellationToken ct = default)
     {
         var conversation = await _applicationContext.Conversations
+            .Include(c => c.Messages.Where(m => m.SenderId != currentUserId && m.ReadAt == null))
             .SingleOrDefaultAsync(c => c.Id == conversationId, ct);
 
         if (conversation is null)

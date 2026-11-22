@@ -115,6 +115,14 @@ public class Conversation
 
         var readAt = now ?? DateTimeOffset.UtcNow;
         AdvanceReadMarker(readerId, readAt);
+
+        foreach (var message in _messages)
+        {
+            if (message.SenderId != readerId && message.ReadAt is null && message.SentAt <= readAt)
+            {
+                message.MarkRead(readAt);
+            }
+        }
     }
 
     private void EnsureParticipant(long userId)

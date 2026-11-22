@@ -144,6 +144,9 @@ namespace SampleTwitter.API.Migrations
                     b.Property<long>("ConversationId")
                         .HasColumnType("bigint");
 
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long>("SenderId")
                         .HasColumnType("bigint");
 

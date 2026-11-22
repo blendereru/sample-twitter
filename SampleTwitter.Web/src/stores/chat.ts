@@ -239,6 +239,20 @@ export const useChatStore = defineStore('chat', () => {
     if (conv && receipt.readerId !== authStore.currentUserId) {
       conv.otherParticipantLastReadAt = receipt.readAt;
     }
+
+    const list = messagesByConversation.value[receipt.conversationId];
+    if (list && receipt.readerId !== authStore.currentUserId) {
+      const readTime = new Date(receipt.readAt).getTime();
+      for (const msg of list) {
+        if (
+          msg.senderId !== receipt.readerId &&
+          !msg.readAt &&
+          new Date(msg.sentAt).getTime() <= readTime
+        ) {
+          msg.readAt = receipt.readAt;
+        }
+      }
+    }
   }
 
   function handleTypingStarted(typing: TypingDto) {

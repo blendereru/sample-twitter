@@ -11,6 +11,7 @@ public class Message
     public User Sender { get; private set; } = null!;
     public string Text { get; private set; } = null!;
     public DateTimeOffset SentAt { get; private set; }
+    public DateTimeOffset? ReadAt { get; private set; }
 
     /// <summary>
     /// Used by EF Core for materialization. Application code must use <see cref="Conversation.SendMessage"/>.
@@ -28,5 +29,10 @@ public class Message
             Text = text,
             SentAt = sentAt
         };
+    }
+
+    internal void MarkRead(DateTimeOffset readAt)
+    {
+        ReadAt ??= readAt;
     }
 }
