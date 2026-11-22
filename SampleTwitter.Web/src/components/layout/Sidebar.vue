@@ -3,10 +3,12 @@ import { ref, computed } from 'vue';
 import { Home, Hash, Bell, Mail, Bookmark, User, Twitter, Feather, LogIn, UserPlus, LogOut, Loader2 } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useChatStore } from '@/stores/chat';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const chatStore = useChatStore();
 const signingOut = ref(false);
 
 const profilePath = computed(() => {
@@ -14,12 +16,12 @@ const profilePath = computed(() => {
 });
 
 const navItems = computed(() => [
-  { name: 'Home', path: '/', icon: Home },
-  { name: 'Explore', path: '/#explore', icon: Hash },
-  { name: 'Notifications', path: '/#notifications', icon: Bell },
-  { name: 'Messages', path: '/#messages', icon: Mail },
-  { name: 'Bookmarks', path: '/bookmarks', icon: Bookmark },
-  { name: 'Profile', path: profilePath.value, icon: User },
+  { name: 'Home', path: '/', icon: Home, badge: 0 },
+  { name: 'Explore', path: '/#explore', icon: Hash, badge: 0 },
+  { name: 'Notifications', path: '/#notifications', icon: Bell, badge: 0 },
+  { name: 'Messages', path: '/messages', icon: Mail, badge: chatStore.totalUnreadCount },
+  { name: 'Bookmarks', path: '/bookmarks', icon: Bookmark, badge: 0 },
+  { name: 'Profile', path: profilePath.value, icon: User, badge: 0 },
 ]);
 
 async function handleLogout() {
@@ -52,10 +54,20 @@ async function handleLogout() {
           :to="item.path"
           :class="[
             'flex items-center gap-4 px-4 py-3 rounded-full text-lg font-medium transition-colors hover:bg-neutral-800/80',
-            route.path === item.path ? 'font-bold text-white' : 'text-neutral-300'
+            route.path === item.path || (item.path === '/messages' && route.path.startsWith('/messages'))
+              ? 'font-bold text-white'
+              : 'text-neutral-300'
           ]"
         >
-          <component :is="item.icon" class="w-6 h-6" />
+          <div class="relative">
+            <component :is="item.icon" class="w-6 h-6" />
+            <span
+              v-if="item.badge > 0"
+              class="absolute -top-1.5 -right-2 min-w-4 h-4 px-1 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center"
+            >
+              {{ item.badge > 99 ? '99+' : item.badge }}
+            </span>
+          </div>
           <span class="hidden xl:inline">{{ item.name }}</span>
         </router-link>
       </nav>

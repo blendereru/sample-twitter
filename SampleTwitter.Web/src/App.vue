@@ -1,13 +1,29 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, watch } from 'vue';
 import Sidebar from '@/components/layout/Sidebar.vue';
 import RightBar from '@/components/layout/RightBar.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useChatStore } from '@/stores/chat';
 
 const authStore = useAuthStore();
+const chatStore = useChatStore();
 
-onMounted(() => {
-  authStore.fetchCurrentUser();
+watch(
+  () => authStore.isAuthenticated,
+  (authenticated) => {
+    if (authenticated) {
+      void chatStore.connect();
+    } else {
+      void chatStore.disconnect();
+    }
+  }
+);
+
+onMounted(async () => {
+  const user = await authStore.fetchCurrentUser();
+  if (user) {
+    void chatStore.connect();
+  }
 });
 </script>
 

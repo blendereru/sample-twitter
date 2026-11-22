@@ -31,6 +31,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
     public UserInsertBarrierInterceptor FollowInsertBarrier => UserInsertBarrier;
 
+    public UserInsertBarrierInterceptor ConversationInsertBarrier => UserInsertBarrier;
+
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();

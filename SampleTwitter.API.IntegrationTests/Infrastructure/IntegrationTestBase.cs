@@ -149,6 +149,35 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return follow;
     }
 
+    protected async Task<Conversation> SeedConversation(
+        long initiatorId,
+        long recipientId,
+        DateTimeOffset? createdAt = null)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+
+        var conversation = Conversation.Start(initiatorId, recipientId, createdAt);
+        db.Conversations.Add(conversation);
+        await db.SaveChangesAsync();
+        return conversation;
+    }
+
+    protected async Task<Message> SeedMessage(
+        long conversationId,
+        long senderId,
+        string text,
+        DateTimeOffset? sentAt = null)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+
+        var conversation = db.Conversations.Single(c => c.Id == conversationId);
+        var message = conversation.SendMessage(senderId, text, sentAt);
+        await db.SaveChangesAsync();
+        return message;
+    }
+
     protected async Task<long> GetUserId(string cookie)
     {
         var message = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me")

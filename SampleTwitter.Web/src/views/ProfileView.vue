@@ -1,18 +1,40 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare, Repeat2 } from 'lucide-vue-next';
+import { ArrowLeft, Calendar, Loader2, AlertCircle, RefreshCw, MessageSquare, Repeat2, Mail } from 'lucide-vue-next';
 import TweetCard from '@/components/tweet/TweetCard.vue';
 import EditProfileModal from '@/components/profile/EditProfileModal.vue';
 import ImageLightbox from '@/components/common/ImageLightbox.vue';
 import { getUser, getUserPosts, getUserReplies, getUserReposts, followUser, unfollowUser } from '@/api/users';
 import { parseApiError } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { useChatStore } from '@/stores/chat';
 import type { PostFeedItemDto, ReplyFeedItemDto, PostResponse, PostAuthorDto, RepostResponse, BookmarkResponse, UserResponse } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const chatStore = useChatStore();
+const startingConversation = ref(false);
+
+async function handleStartMessage() {
+  if (!authStore.isAuthenticated) {
+    router.push('/login');
+    return;
+  }
+  if (startingConversation.value || !targetUserId.value || isMyProfile.value) return;
+
+  startingConversation.value = true;
+  try {
+    const conv = await chatStore.startOrOpenConversation(targetUserId.value);
+    router.push(`/messages/${conv.id}`);
+  } catch (err: unknown) {
+    const parsed = parseApiError(err);
+    error.value = parsed.detail || parsed.message || 'Failed to start conversation.';
+  } finally {
+    startingConversation.value = false;
+  }
+}
 
 const targetUserId = computed<number>(() => {
   const idParam = route.params.id;
@@ -485,7 +507,7 @@ watch(
               img-class="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-black object-cover bg-neutral-800 shadow-xl"
             />
 
-            <div class="mt-2">
+            <div class="mt-2 flex items-center gap-2">
               <button
                 v-if="isMyProfile"
                 @click="showEditModal = true"
@@ -493,23 +515,34 @@ watch(
               >
                 Edit profile
               </button>
-              <button
-                v-else
-                @click="handleToggleFollow"
-                @mouseenter="followHover = true"
-                @mouseleave="followHover = false"
-                :disabled="isFollowLoading"
-                :class="[
-                  'font-bold text-sm px-5 py-1.5 rounded-full transition-colors cursor-pointer min-w-[104px] disabled:opacity-50',
-                  userInfo?.isFollowing
-                    ? followHover
-                      ? 'border border-red-800 bg-red-950/30 text-red-500'
-                      : 'border border-neutral-600 bg-black text-white'
-                    : 'bg-white hover:bg-neutral-200 text-black'
-                ]"
-              >
-                {{ userInfo?.isFollowing ? (followHover ? 'Unfollow' : 'Following') : 'Follow' }}
-              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  @click="handleStartMessage"
+                  :disabled="startingConversation"
+                  title="Message"
+                  class="p-2 rounded-full border border-neutral-600 hover:bg-neutral-900 text-white transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <Loader2 v-if="startingConversation" class="w-4 h-4 animate-spin" />
+                  <Mail v-else class="w-4 h-4" />
+                </button>
+                <button
+                  @click="handleToggleFollow"
+                  @mouseenter="followHover = true"
+                  @mouseleave="followHover = false"
+                  :disabled="isFollowLoading"
+                  :class="[
+                    'font-bold text-sm px-5 py-1.5 rounded-full transition-colors cursor-pointer min-w-[104px] disabled:opacity-50',
+                    userInfo?.isFollowing
+                      ? followHover
+                        ? 'border border-red-800 bg-red-950/30 text-red-500'
+                        : 'border border-neutral-600 bg-black text-white'
+                      : 'bg-white hover:bg-neutral-200 text-black'
+                  ]"
+                >
+                  {{ userInfo?.isFollowing ? (followHover ? 'Unfollow' : 'Following') : 'Follow' }}
+                </button>
+              </template>
             </div>
           </div>
 

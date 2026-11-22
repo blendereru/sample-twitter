@@ -40,6 +40,45 @@ namespace SampleTwitter.API.Migrations
                     b.ToTable("Bookmarks");
                 });
 
+            modelBuilder.Entity("SampleTwitter.API.Models.Conversation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastMessageAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ParticipantAId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ParticipantALastReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ParticipantBId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ParticipantBLastReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParticipantBId");
+
+                    b.HasIndex("ParticipantAId", "ParticipantBId")
+                        .IsUnique();
+
+                    b.ToTable("Conversations", t =>
+                        {
+                            t.HasCheckConstraint("CK_Conversations_ParticipantOrder", "\"ParticipantAId\" < \"ParticipantBId\"");
+                        });
+                });
+
             modelBuilder.Entity("SampleTwitter.API.Models.EmailConfirmationToken", b =>
                 {
                     b.Property<long>("Id")
@@ -92,6 +131,38 @@ namespace SampleTwitter.API.Migrations
                     b.HasIndex("FollowingId", "CreatedAt");
 
                     b.ToTable("Follows");
+                });
+
+            modelBuilder.Entity("SampleTwitter.API.Models.Message", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ConversationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SenderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderId");
+
+                    b.HasIndex("ConversationId", "SentAt", "Id")
+                        .IsDescending(false, true, true);
+
+                    b.ToTable("Messages");
                 });
 
             modelBuilder.Entity("SampleTwitter.API.Models.PasswordResetToken", b =>
@@ -261,6 +332,25 @@ namespace SampleTwitter.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SampleTwitter.API.Models.Conversation", b =>
+                {
+                    b.HasOne("SampleTwitter.API.Models.User", "ParticipantA")
+                        .WithMany()
+                        .HasForeignKey("ParticipantAId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SampleTwitter.API.Models.User", "ParticipantB")
+                        .WithMany()
+                        .HasForeignKey("ParticipantBId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ParticipantA");
+
+                    b.Navigation("ParticipantB");
+                });
+
             modelBuilder.Entity("SampleTwitter.API.Models.EmailConfirmationToken", b =>
                 {
                     b.HasOne("SampleTwitter.API.Models.User", "User")
@@ -289,6 +379,25 @@ namespace SampleTwitter.API.Migrations
                     b.Navigation("Follower");
 
                     b.Navigation("Following");
+                });
+
+            modelBuilder.Entity("SampleTwitter.API.Models.Message", b =>
+                {
+                    b.HasOne("SampleTwitter.API.Models.Conversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SampleTwitter.API.Models.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("SampleTwitter.API.Models.PasswordResetToken", b =>
@@ -344,6 +453,11 @@ namespace SampleTwitter.API.Migrations
                     b.Navigation("Post");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SampleTwitter.API.Models.Conversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("SampleTwitter.API.Models.Post", b =>

@@ -8,6 +8,8 @@ import ResetPasswordView from '@/views/ResetPasswordView.vue';
 import ProfileView from '@/views/ProfileView.vue';
 import PostDetailView from '@/views/PostDetailView.vue';
 import BookmarksView from '@/views/BookmarksView.vue';
+import MessagesView from '@/views/MessagesView.vue';
+import ConversationView from '@/views/ConversationView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +48,16 @@ const router = createRouter({
       path: '/bookmarks',
       name: 'bookmarks',
       component: BookmarksView,
+    },
+    {
+      path: '/messages',
+      name: 'messages',
+      component: MessagesView,
+    },
+    {
+      path: '/messages/:id',
+      name: 'conversation',
+      component: ConversationView,
     },
     {
       path: '/profile/:id',

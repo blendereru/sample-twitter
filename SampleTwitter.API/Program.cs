@@ -5,6 +5,7 @@ using Microsoft.Extensions.FileProviders;
 using SampleTwitter.API.Abstractions;
 using SampleTwitter.API.Data;
 using SampleTwitter.API.ExceptionHandlers;
+using SampleTwitter.API.Hubs;
 using SampleTwitter.API.Options;
 using SampleTwitter.API.Services;
 using Scalar.AspNetCore;
@@ -40,6 +41,8 @@ builder.Services.AddDbContext<ApplicationContext>(options =>
 });
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IPostService, PostService>();
+builder.Services.AddScoped<IMessagingService, MessagingService>();
+builder.Services.AddScoped<IChatNotifier, SignalRChatNotifier>();
 builder.Services.AddScoped<IEmailConfirmationService, EmailConfirmationService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
@@ -47,6 +50,7 @@ builder.Services.AddScoped<IImageStorage, LocalFileImageStorage>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<ISecureTokenGenerator, SecureTokenGenerator>();
 builder.Services.AddSingleton<IUsernameGenerator, UsernameGenerator>();
+builder.Services.AddSignalR();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("AppSettings"));
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
@@ -106,6 +110,7 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 try
 {
     Log.Information("Starting web application");

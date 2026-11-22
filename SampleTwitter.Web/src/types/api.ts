@@ -247,3 +247,49 @@ export interface ResendConfirmationEmailResponse {
 export interface SignOutResponse {
   message: string;
 }
+
+
+export interface ConversationParticipantDto {
+  id: number;
+  username: string;
+  imageUrl?: string | null;
+}
+
+export interface MessageResponse {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  senderUsername: string;
+  text: string;
+  sentAt: string;
+  pending?: boolean;
+}
+
+export interface ConversationResponse {
+  id: number;
+  otherParticipant: ConversationParticipantDto;
+  createdAt: string;
+  lastMessageAt?: string | null;
+  lastMessage?: MessageResponse | null;
+  unreadCount: number;
+  otherParticipantLastReadAt?: string | null;
+}
+
+export interface StartConversationRequest {
+  recipientId: number;
+}
+
+export interface SendMessageRequest {
+  text: string;
+}
+
+export interface ConversationReadDto {
+  conversationId: number;
+  readerId: number;
+  readAt: string;
+}
+
+export interface TypingDto {
+  conversationId: number;
+  userId: number;
+}

@@ -14,6 +14,8 @@ public class ApplicationContext : DbContext
     public DbSet<Repost> Reposts { get; set; } = null!;
     public DbSet<Bookmark> Bookmarks { get; set; } = null!;
     public DbSet<Follow> Follows { get; set; } = null!;
+    public DbSet<Conversation> Conversations { get; set; } = null!;
+    public DbSet<Message> Messages { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -128,6 +130,45 @@ public class ApplicationContext : DbContext
             builder.Property(p => p.Text).HasMaxLength(Post.MaxTextLength);
 
             builder.HasQueryFilter(p => !p.IsDeleted);
+        });
+
+        modelBuilder.Entity<Conversation>(builder =>
+        {
+            builder.ToTable(t =>
+                t.HasCheckConstraint("CK_Conversations_ParticipantOrder", "\"ParticipantAId\" < \"ParticipantBId\""));
+
+            builder.HasOne(c => c.ParticipantA)
+                .WithMany()
+                .HasForeignKey(c => c.ParticipantAId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne(c => c.ParticipantB)
+                .WithMany()
+                .HasForeignKey(c => c.ParticipantBId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasIndex(c => new { c.ParticipantAId, c.ParticipantBId }).IsUnique();
+            builder.HasIndex(c => c.ParticipantBId);
+        });
+
+        modelBuilder.Entity<Message>(builder =>
+        {
+            builder.HasOne(m => m.Conversation)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(m => m.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Property(m => m.Text)
+                .HasMaxLength(Message.MaxTextLength)
+                .IsRequired();
+
+            builder.HasIndex(m => new { m.ConversationId, m.SentAt, m.Id })
+                .IsDescending(false, true, true);
         });
     }
 }
